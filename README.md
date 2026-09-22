@@ -67,6 +67,16 @@ The app installs the pack on launch and refreshes it whenever the file changes.
 - **On your computer:** `server/data/store.json`, one JSON document, written atomically. Back it up like any file.
 - **Backups:** You → Your data → *Download backup* gives you a full JSON snapshot; *Restore* merges it back (newer records win). *Export diary (CSV)* for spreadsheets.
 
+### Free hosting on Netlify (with sync, no computer needed)
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/Dhruv123-123/cronofree)
+
+1. Click the button (or in Netlify: *Add new site → Import an existing project → GitHub → cronofree*). The build settings come from `netlify.toml`; nothing to type.
+2. In *Site configuration → Environment variables* add `CRONOFREE_TOKEN` = any long random string, then trigger a redeploy.
+3. Open your `*.netlify.app` URL on your phone, add it to the Home Screen (it is HTTPS, so it works fully offline), and paste the token into **You → Sync** on every device. Leave the server URL blank.
+
+Sync runs as a Netlify Function backed by Netlify Blobs, both on the free tier. Your data is one JSON blob in your own Netlify account; the recipe-from-URL importer works there too. You can still run `npm start` on your computer instead, or point the app at that server by URL.
+
 ### Reaching the server from outside your Wi-Fi
 
 The server is plain HTTP, which is fine on your LAN. To use it from anywhere, put it behind anything that gives you HTTPS: [Tailscale](https://tailscale.com) (`tailscale serve 8787` gives you a `https://…ts.net` URL with a valid certificate), Cloudflare Tunnel, or a small VPS with Caddy. The app is a static build, so you can also host `dist/` on Netlify (config included) and point **You → Sync → Server URL** at your tunnel address.

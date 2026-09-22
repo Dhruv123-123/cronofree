@@ -13,6 +13,7 @@ import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { applySync, emptyStore, rowCount, COLLECTIONS, tokenMatches } from "./syncCore.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -38,7 +39,7 @@ function loadStore() {
   try {
     return JSON.parse(fs.readFileSync(STORE, "utf8"));
   } catch {
-    return { seq: 0, collections: {} };
+    return emptyStore();
   }
 }
 const store = loadStore();
@@ -54,13 +55,7 @@ function persist() {
 }
 process.on("SIGINT", () => { if (writeTimer) { clearTimeout(writeTimer); writeTimer = null; fs.writeFileSync(STORE, JSON.stringify(store)); } process.exit(0); });
 
-const COLLECTIONS = new Set(["foods", "recipes", "entries", "savedMeals", "water", "fasts", "weights", "measurements", "photos", "profile", "dayOverrides", "exercises", "programs", "workouts", "biometrics"]);
-
-function rowCount() {
-  let n = 0;
-  for (const c of Object.values(store.collections)) n += Object.keys(c).length;
-  return n;
-}
+void COLLECTIONS;
 
 const app = express();
 app.disable("x-powered-by");
@@ -79,38 +74,20 @@ app.use("/api", (req, res, next) => {
 function auth(req, res, next) {
   const h = req.headers.authorization || "";
   const t = h.startsWith("Bearer ") ? h.slice(7).trim() : "";
-  if (!t || !crypto.timingSafeEqual(Buffer.from(t.padEnd(64)), Buffer.from(TOKEN.padEnd(64)))) return res.status(401).json({ error: "unauthorized" });
+  if (!tokenMatches(t, TOKEN)) return res.status(401).json({ error: "unauthorized" });
   next();
 }
 
 app.get("/api/health", auth, (_req, res) => {
-  res.json({ ok: true, name: `${os.hostname()} · cronofree`, rows: rowCount(), seq: store.seq });
+  res.json({ ok: true, name: `${os.hostname()} · cronofree`, rows: rowCount(store), seq: store.seq });
 });
 
 app.post("/api/sync", auth, (req, res) => {
   const since = Number(req.body?.since || 0);
   const changes = Array.isArray(req.body?.changes) ? req.body.changes : [];
-  let accepted = 0;
-  const pushedIds = new Set();
-  for (const c of changes) {
-    if (!c || !COLLECTIONS.has(c.collection) || !c.row || typeof c.row.id !== "string") continue;
-    const col = (store.collections[c.collection] ||= {});
-    const cur = col[c.row.id];
-    if (!cur || (c.row.updatedAt || 0) >= (cur.row.updatedAt || 0)) {
-      store.seq += 1;
-      col[c.row.id] = { row: c.row, seq: store.seq };
-      accepted += 1;
-    }
-    pushedIds.add(`${c.collection}:${c.row.id}`);
-  }
-  const out = [];
-  for (const [name, col] of Object.entries(store.collections)) {
-    for (const [id, rec] of Object.entries(col)) {
-      if (rec.seq > since && !pushedIds.has(`${name}:${id}`)) out.push({ collection: name, row: rec.row });
-    }
-  }
-  if (accepted) persist();
-  res.json({ seq: store.seq, changes: out, accepted });
+  const { result, changed } = applySync(store, since, changes);
+  if (changed) persist();
+  res.json(result);
 });
 
 // Fetch proxy for recipe import (browsers block cross-origin page fetches). Token-protected, small, short.
