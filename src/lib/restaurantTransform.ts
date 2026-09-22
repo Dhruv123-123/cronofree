@@ -56,7 +56,7 @@ export function validatePack(pack: RestaurantPack): string[] {
       const where = `${r.name} → ${it.name}`;
       for (const k of ["kcal", "protein", "carbs", "fat", "grams"] as const) if (typeof it[k] !== "number" || !Number.isFinite(it[k])) problems.push(`${where}: ${k} must be a number`);
       if (it.basis !== "published" && it.basis !== "estimated") problems.push(`${where}: basis must be published|estimated`);
-      if (MEAT.test(`${it.name} ${it.description ?? ""}`) && !/\b(no |without |veggie|vegan|plant|impossible|beyond|tofu|mock|meatless|vegetarian)\b/i.test(`${it.name} ${it.description ?? ""}`)) problems.push(`${where}: looks non-vegetarian`);
+      if (!it.vegan && MEAT.test(`${it.name} ${it.description ?? ""}`) && !/\b(no |without |veggie|vegan|plant|impossible|beyond|tofu|mock|meatless|vegetarian)\b/i.test(`${it.name} ${it.description ?? ""}`)) problems.push(`${where}: looks non-vegetarian`);
       if (it.kcal > 0 && Math.abs((it.protein * 4 + it.carbs * 4 + it.fat * 9) - it.kcal) > Math.max(120, it.kcal * 0.35)) problems.push(`${where}: macros (${it.protein * 4 + it.carbs * 4 + it.fat * 9} kcal) disagree with kcal ${it.kcal}`);
     }
   }
