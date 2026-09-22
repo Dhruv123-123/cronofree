@@ -66,6 +66,11 @@ const OFF_MAP: [NutrientKey, string, number][] = [
   ["vitB12", "vitamin-b12_100g", 1_000_000],
   ["caffeine", "caffeine_100g", 1000],
   ["alcohol", "alcohol_100g", 1],
+  ["copper", "copper_100g", 1000],
+  ["manganese", "manganese_100g", 1000],
+  ["pantothenicAcid", "pantothenic-acid_100g", 1000],
+  ["omega6", "omega-6-fat_100g", 1],
+  ["starch", "starch_100g", 1],
 ];
 
 function offNutrients(n: Record<string, unknown> = {}): Nutrients {
@@ -156,6 +161,11 @@ const USDA_MAP: Record<string, [NutrientKey, number]> = {
   "430": ["vitK", 1], "404": ["thiamin", 1], "405": ["riboflavin", 1], "406": ["niacin", 1], "415": ["vitB6", 1],
   "417": ["folate", 1], "435": ["folate", 1], "418": ["vitB12", 1], "421": ["choline", 1], "262": ["caffeine", 1],
   "221": ["alcohol", 1], "255": ["water", 1], "851": ["omega3", 1],
+  "312": ["copper", 1], "315": ["manganese", 1], "410": ["pantothenicAcid", 1], "209": ["starch", 1],
+  "501": ["tryptophan", 1], "502": ["threonine", 1], "503": ["isoleucine", 1], "504": ["leucine", 1], "505": ["lysine", 1],
+  "506": ["methionine", 1], "507": ["cystine", 1], "508": ["phenylalanine", 1], "509": ["tyrosine", 1], "510": ["valine", 1],
+  "511": ["arginine", 1], "512": ["histidine", 1], "513": ["alanine", 1], "514": ["asparticAcid", 1], "515": ["glutamicAcid", 1],
+  "516": ["glycine", 1], "517": ["proline", 1], "518": ["serine", 1],
 };
 
 interface UsdaNutrient { nutrientNumber?: string; nutrientId?: number; number?: string; value?: number; amount?: number; unitName?: string; nutrient?: { number?: string; unitName?: string } }
@@ -165,9 +175,10 @@ interface UsdaFood {
   foodNutrients?: UsdaNutrient[]; foodPortions?: UsdaPortion[]; servingSize?: number; servingSizeUnit?: string; householdServingFullText?: string; foodCategory?: string | { description?: string };
 }
 
-function usdaNutrients(list: UsdaNutrient[] = []): Nutrients {
+export function usdaNutrients(list: UsdaNutrient[] = []): Nutrients {
   const out: Nutrients = {};
   let omega3 = 0;
+  let omega6 = 0;
   for (const n of list) {
     const number = String(n.nutrientNumber ?? n.number ?? n.nutrient?.number ?? "");
     const value = num(n.value ?? n.amount);
@@ -175,6 +186,7 @@ function usdaNutrients(list: UsdaNutrient[] = []): Nutrients {
     const unit = String(n.unitName ?? n.nutrient?.unitName ?? "").toUpperCase();
     // omega-3 components (ALA 851, EPA 629, DPA 631, DHA 621)
     if (["629", "631", "621"].includes(number)) { omega3 += value; continue; }
+    if (["618", "620"].includes(number)) { omega6 += value; continue; }
     const m = USDA_MAP[number];
     if (!m) continue;
     const [key] = m;
@@ -185,6 +197,7 @@ function usdaNutrients(list: UsdaNutrient[] = []): Nutrients {
     out[key] = value;
   }
   if (omega3 > 0) out.omega3 = (out.omega3 ?? 0) + omega3;
+  if (omega6 > 0) out.omega6 = omega6;
   if (out.kcal === undefined && (out.protein !== undefined || out.carbs !== undefined)) out.kcal = macroKcal(out);
   return out;
 }
@@ -199,7 +212,7 @@ function usdaServings(f: UsdaFood, id: string): Serving[] {
     const desc = p.portionDescription || [p.amount, p.measureUnit?.name, p.modifier].filter((x) => x && x !== "undetermined").join(" ");
     if (!desc || /quantity not specified/i.test(desc)) continue;
     out.push({ id: `${id}_p${i}`, label: desc.trim(), grams: g });
-    if (out.length >= 6) break;
+    if (out.length >= 8) break;
   }
   const ss = num(f.servingSize);
   if (ss && ss > 0 && (f.servingSizeUnit ?? "g").toLowerCase().startsWith("g") || (f.servingSizeUnit ?? "").toLowerCase().startsWith("ml")) {

@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from "dexie";
 import type {
   Food, Recipe, DiaryEntry, SavedMeal, WaterLog, Fast, WeightEntry, Measurement, Photo, Profile,
-  DayTargetOverride, Exercise, Program, Workout, Outbox, KV, Collection, Base,
+  DayTargetOverride, Exercise, Program, Workout, Outbox, KV, Collection, Base, Biometric,
 } from "./types";
 
 export class CronofreeDB extends Dexie {
@@ -19,6 +19,7 @@ export class CronofreeDB extends Dexie {
   exercises!: EntityTable<Exercise, "id">;
   programs!: EntityTable<Program, "id">;
   workouts!: EntityTable<Workout, "id">;
+  biometrics!: EntityTable<Biometric, "id">;
   outbox!: EntityTable<Outbox, "key">;
   kv!: EntityTable<KV, "key">;
 
@@ -42,6 +43,9 @@ export class CronofreeDB extends Dexie {
       outbox: "key, collection, at",
       kv: "key",
     });
+    this.version(2).stores({
+      biometrics: "id, date, kind, at, updatedAt, deletedAt",
+    });
   }
 }
 
@@ -49,7 +53,7 @@ export const db = new CronofreeDB();
 
 export const COLLECTIONS: Collection[] = [
   "foods", "recipes", "entries", "savedMeals", "water", "fasts", "weights", "measurements",
-  "photos", "profile", "dayOverrides", "exercises", "programs", "workouts",
+  "photos", "profile", "dayOverrides", "exercises", "programs", "workouts", "biometrics",
 ];
 
 export function table<T extends Base>(c: Collection): EntityTable<T, "id"> {

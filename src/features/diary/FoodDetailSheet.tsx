@@ -23,11 +23,13 @@ export default function FoodDetailSheet({ food, open, onClose, date, mealId, mea
   const [meal, setMeal] = useState(mealId);
   const [showAll, setShowAll] = useState(false);
   const [fav, setFav] = useState(!!food?.favorite);
+  const [time, setTime] = useState("");
 
   useEffect(() => {
     if (!food || !open) return;
     setFav(!!food.favorite);
     setMeal(entry?.mealId ?? mealId);
+    setTime(entry?.time ?? "");
     if (entry) {
       const s = entry.servingLabel ? food.servings.find((x) => x.label === entry.servingLabel) : undefined;
       if (s && entry.servingQty) { setServingId(s.id); setQty(entry.servingQty); }
@@ -49,7 +51,7 @@ export default function FoodDetailSheet({ food, open, onClose, date, mealId, mea
   async function submit() {
     if (!food || totalGrams <= 0) return;
     if (entry) {
-      await updateEntry(entry, { grams: totalGrams, servingLabel: serving?.label, servingQty: serving ? Number(qty) : undefined, mealId: meal });
+      await updateEntry(entry, { grams: totalGrams, servingLabel: serving?.label, servingQty: serving ? Number(qty) : undefined, mealId: meal, time: time || entry.time });
       toast("Updated");
     } else {
       await logFood({ food, grams: totalGrams, serving: serving ?? undefined, qty: serving ? Number(qty) : undefined, date, mealId: meal });
@@ -139,6 +141,7 @@ export default function FoodDetailSheet({ food, open, onClose, date, mealId, mea
         <div className="mb-2 text-[13px] font-medium text-ink-2">Meal</div>
         <Segmented value={meal} onChange={setMeal} options={meals.map((m) => ({ value: m.id, label: m.name }))} className="w-full" />
       </div>
+      {entry && <label className="mt-3 flex items-center justify-between text-[13px] text-ink-2">Time eaten<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="field !h-9 !w-auto !py-0" /></label>}
 
       <button onClick={() => setShowAll((s) => !s)} className="mt-5 flex w-full items-center justify-between py-2 text-[14px] font-medium text-ink-2">
         <span>All nutrients · % of daily target</span>{showAll ? <ChevronUp size={18} /> : <ChevronDown size={18} />}

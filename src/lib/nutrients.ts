@@ -6,8 +6,10 @@ export type NutrientKey =
   | "kcal" | "protein" | "carbs" | "fiber" | "sugar" | "addedSugar" | "fat" | "satFat"
   | "monoFat" | "polyFat" | "transFat" | "cholesterol" | "sodium" | "potassium" | "calcium"
   | "iron" | "magnesium" | "phosphorus" | "zinc" | "selenium" | "vitA" | "vitC" | "vitD" | "vitE"
-  | "vitK" | "thiamin" | "riboflavin" | "niacin" | "vitB6" | "folate" | "vitB12" | "choline"
-  | "omega3" | "caffeine" | "alcohol" | "water";
+  | "vitK" | "thiamin" | "riboflavin" | "niacin" | "vitB6" | "folate" | "vitB12" | "choline" | "pantothenicAcid"
+  | "manganese" | "copper" | "omega3" | "omega6" | "caffeine" | "alcohol" | "water" | "starch"
+  | "tryptophan" | "threonine" | "isoleucine" | "leucine" | "lysine" | "methionine" | "cystine" | "phenylalanine"
+  | "tyrosine" | "valine" | "arginine" | "histidine" | "alanine" | "asparticAcid" | "glutamicAcid" | "glycine" | "proline" | "serine";
 
 export type Nutrients = Partial<Record<NutrientKey, number>>;
 
@@ -16,7 +18,7 @@ export interface NutrientDef {
   label: string;
   short: string;
   unit: "kcal" | "g" | "mg" | "µg";
-  group: "energy" | "macro" | "carb" | "lipid" | "mineral" | "vitamin" | "other";
+  group: "energy" | "macro" | "carb" | "lipid" | "mineral" | "vitamin" | "amino" | "other";
   decimals: number;
   /** true when less is better (sodium, sat fat, added sugar…) */
   limit?: boolean;
@@ -35,6 +37,7 @@ export const NUTRIENTS: NutrientDef[] = [
   { key: "polyFat", label: "Polyunsaturated fat", short: "Poly", unit: "g", group: "lipid", decimals: 1 },
   { key: "transFat", label: "Trans fat", short: "Trans", unit: "g", group: "lipid", decimals: 1, limit: true },
   { key: "omega3", label: "Omega-3", short: "Omega-3", unit: "g", group: "lipid", decimals: 2 },
+  { key: "omega6", label: "Omega-6", short: "Omega-6", unit: "g", group: "lipid", decimals: 2 },
   { key: "cholesterol", label: "Cholesterol", short: "Chol", unit: "mg", group: "lipid", decimals: 0, limit: true },
   { key: "sodium", label: "Sodium", short: "Sodium", unit: "mg", group: "mineral", decimals: 0, limit: true },
   { key: "potassium", label: "Potassium", short: "Potassium", unit: "mg", group: "mineral", decimals: 0 },
@@ -44,6 +47,8 @@ export const NUTRIENTS: NutrientDef[] = [
   { key: "phosphorus", label: "Phosphorus", short: "Phos", unit: "mg", group: "mineral", decimals: 0 },
   { key: "zinc", label: "Zinc", short: "Zinc", unit: "mg", group: "mineral", decimals: 1 },
   { key: "selenium", label: "Selenium", short: "Se", unit: "µg", group: "mineral", decimals: 0 },
+  { key: "copper", label: "Copper", short: "Cu", unit: "mg", group: "mineral", decimals: 2 },
+  { key: "manganese", label: "Manganese", short: "Mn", unit: "mg", group: "mineral", decimals: 2 },
   { key: "vitA", label: "Vitamin A", short: "A", unit: "µg", group: "vitamin", decimals: 0 },
   { key: "vitC", label: "Vitamin C", short: "C", unit: "mg", group: "vitamin", decimals: 0 },
   { key: "vitD", label: "Vitamin D", short: "D", unit: "µg", group: "vitamin", decimals: 1 },
@@ -55,7 +60,27 @@ export const NUTRIENTS: NutrientDef[] = [
   { key: "vitB6", label: "Vitamin B6", short: "B6", unit: "mg", group: "vitamin", decimals: 2 },
   { key: "folate", label: "Folate", short: "Folate", unit: "µg", group: "vitamin", decimals: 0 },
   { key: "vitB12", label: "Vitamin B12", short: "B12", unit: "µg", group: "vitamin", decimals: 2 },
+  { key: "pantothenicAcid", label: "Pantothenic acid (B5)", short: "B5", unit: "mg", group: "vitamin", decimals: 2 },
   { key: "choline", label: "Choline", short: "Choline", unit: "mg", group: "vitamin", decimals: 0 },
+  { key: "starch", label: "Starch", short: "Starch", unit: "g", group: "carb", decimals: 1 },
+  { key: "histidine", label: "Histidine", short: "His", unit: "g", group: "amino", decimals: 2 },
+  { key: "isoleucine", label: "Isoleucine", short: "Ile", unit: "g", group: "amino", decimals: 2 },
+  { key: "leucine", label: "Leucine", short: "Leu", unit: "g", group: "amino", decimals: 2 },
+  { key: "lysine", label: "Lysine", short: "Lys", unit: "g", group: "amino", decimals: 2 },
+  { key: "methionine", label: "Methionine", short: "Met", unit: "g", group: "amino", decimals: 2 },
+  { key: "phenylalanine", label: "Phenylalanine", short: "Phe", unit: "g", group: "amino", decimals: 2 },
+  { key: "threonine", label: "Threonine", short: "Thr", unit: "g", group: "amino", decimals: 2 },
+  { key: "tryptophan", label: "Tryptophan", short: "Trp", unit: "g", group: "amino", decimals: 2 },
+  { key: "valine", label: "Valine", short: "Val", unit: "g", group: "amino", decimals: 2 },
+  { key: "cystine", label: "Cystine", short: "Cys", unit: "g", group: "amino", decimals: 2 },
+  { key: "tyrosine", label: "Tyrosine", short: "Tyr", unit: "g", group: "amino", decimals: 2 },
+  { key: "arginine", label: "Arginine", short: "Arg", unit: "g", group: "amino", decimals: 2 },
+  { key: "alanine", label: "Alanine", short: "Ala", unit: "g", group: "amino", decimals: 2 },
+  { key: "asparticAcid", label: "Aspartic acid", short: "Asp", unit: "g", group: "amino", decimals: 2 },
+  { key: "glutamicAcid", label: "Glutamic acid", short: "Glu", unit: "g", group: "amino", decimals: 2 },
+  { key: "glycine", label: "Glycine", short: "Gly", unit: "g", group: "amino", decimals: 2 },
+  { key: "proline", label: "Proline", short: "Pro", unit: "g", group: "amino", decimals: 2 },
+  { key: "serine", label: "Serine", short: "Ser", unit: "g", group: "amino", decimals: 2 },
   { key: "caffeine", label: "Caffeine", short: "Caffeine", unit: "mg", group: "other", decimals: 0, limit: true },
   { key: "alcohol", label: "Alcohol", short: "Alcohol", unit: "g", group: "other", decimals: 1, limit: true },
   { key: "water", label: "Water", short: "Water", unit: "g", group: "other", decimals: 0 },
@@ -122,10 +147,17 @@ export interface NutrientTargets {
  * Dietary reference intakes (NIH/IOM DRIs, adults). Limits use the DGA / AHA
  * guidance. Returns a per-day target map keyed by NutrientKey.
  */
-export function referenceTargets(sex: Sex, age: number, kcal: number): Nutrients {
+export function referenceTargets(sex: Sex, age: number, kcal: number, kg = 70): Nutrients {
   const f = sex === "female";
   const older = age >= 51;
+  const aa = (mgPerKg: number) => Math.round(mgPerKg * kg) / 1000; // WHO/FAO 2007 adult requirements, g/day
   const t: Nutrients = {
+    manganese: f ? 1.8 : 2.3,
+    copper: 0.9,
+    pantothenicAcid: 5,
+    omega6: f ? (older ? 11 : 12) : older ? 14 : 17,
+    histidine: aa(10), isoleucine: aa(20), leucine: aa(39), lysine: aa(30), methionine: aa(10.4), cystine: aa(4.1),
+    phenylalanine: aa(25), threonine: aa(15), tryptophan: aa(4), valine: aa(26),
     fiber: Math.round((kcal / 1000) * 14),
     addedSugar: Math.round((kcal * 0.1) / 4),
     satFat: Math.round((kcal * 0.1) / 9),

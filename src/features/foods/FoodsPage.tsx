@@ -14,8 +14,11 @@ import { FoodRow } from "@/features/diary/AddFoodSheet";
 import FoodDetailSheet from "@/features/diary/FoodDetailSheet";
 import CustomFoodSheet from "./CustomFoodSheet";
 import RecipeEditor from "./RecipeEditor";
+import NutrientFinder from "./NutrientFinder";
+import RecipeUrlImport from "./RecipeUrlImport";
+import { Link2 } from "lucide-react";
 
-type Tab = "browse" | "mine" | "recipes" | "meals";
+type Tab = "browse" | "mine" | "recipes" | "meals" | "find";
 
 export default function FoodsPage() {
   const profile = useProfile();
@@ -28,6 +31,7 @@ export default function FoodsPage() {
   const [recipe, setRecipe] = useState<{ open: boolean; initial?: Recipe | null }>({ open: false });
   const [confirm, setConfirm] = useState<{ kind: "food" | "recipe" | "meal"; id: string; recipe?: Recipe } | null>(null);
   const [mealView, setMealView] = useState<SavedMeal | null>(null);
+  const [urlImport, setUrlImport] = useState(false);
 
   const foods = useLiveQuery(() => db.foods.filter((f) => !f.deletedAt).toArray(), []);
   const recipesLive = useLiveQuery(() => db.recipes.filter((r) => !r.deletedAt).toArray(), []);
@@ -36,7 +40,7 @@ export default function FoodsPage() {
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    for (const f of foods ?? []) if (f.category && f.source === "seed") set.add(f.category);
+    for (const f of foods ?? []) if (f.category && (f.source === "seed" || f.source === "usda")) set.add(f.category);
     return [...set].sort();
   }, [foods]);
 
@@ -64,7 +68,7 @@ export default function FoodsPage() {
         </div>
       }>
         <div className="px-4 pb-2 md:px-0">
-          <Segmented value={tab} onChange={setTab} className="w-full" options={[{ value: "browse", label: "Browse" }, { value: "mine", label: "My foods" }, { value: "recipes", label: "Recipes" }, { value: "meals", label: "Meals" }]} />
+          <Segmented value={tab} onChange={setTab} className="w-full" options={[{ value: "browse", label: "Browse" }, { value: "find", label: "Find" }, { value: "mine", label: "Mine" }, { value: "recipes", label: "Recipes" }, { value: "meals", label: "Meals" }]} />
         </div>
       </PageHeader>
       <Page>
@@ -83,12 +87,15 @@ export default function FoodsPage() {
               </div>
             )}
             <div className="card divide-y divide-line px-4">
-              {browse.map((f) => <FoodRow key={f.id} food={f} onClick={() => setDetail(f)} />)}
+              {browse.slice(0, 200).map((f) => <FoodRow key={f.id} food={f} onClick={() => setDetail(f)} />)}
               {browse.length === 0 && <EmptyState title="No foods here" body="Anything you log from USDA or Open Food Facts is saved here for offline use." />}
+              {browse.length > 200 && <div className="py-3 text-center text-[12px] text-ink-3">Showing 200 of {browse.length.toLocaleString()} · search to narrow down</div>}
             </div>
-            <p className="text-[12px] text-ink-3">{foods?.length ?? 0} foods saved on this device. Starter foods use USDA reference values; online results are cached the first time you log them.</p>
+            <p className="text-[12px] text-ink-3">{(foods?.length ?? 0).toLocaleString()} foods on this device, searchable offline. Online results are cached the first time you log them.</p>
           </>
         )}
+
+        {tab === "find" && <NutrientFinder onPick={(f) => setDetail(f)} />}
 
         {tab === "mine" && (
           <div className="card divide-y divide-line px-4">
@@ -106,7 +113,8 @@ export default function FoodsPage() {
 
         {tab === "recipes" && (
           <div className="card divide-y divide-line px-4">
-            {(recipesLive?.length ?? 0) === 0 && <EmptyState title="No recipes yet" body="Add ingredients once, set how many servings it makes, then log a serving in one tap. Cooked weight optional." action={<Button variant="primary" onClick={() => setRecipe({ open: true })}><ChefHat size={16} /> New recipe</Button>} />}
+            <div className="flex gap-2 py-3"><Button size="sm" onClick={() => setUrlImport(true)}><Link2 size={14} /> Import from a link</Button><Button size="sm" variant="soft" onClick={() => setRecipe({ open: true })}><ChefHat size={14} /> New recipe</Button></div>
+            {(recipesLive?.length ?? 0) === 0 && <EmptyState title="No recipes yet" body="Add ingredients once, set how many servings it makes, then log a serving in one tap. Or paste a recipe link and we match the ingredients for you." />}
             {(recipesLive ?? []).sort((a, b) => a.name.localeCompare(b.name)).map((r) => {
               const f = recipeFoods.get(r.foodId);
               return (
@@ -139,6 +147,7 @@ export default function FoodsPage() {
 
       <FoodDetailSheet food={detail} open={!!detail} onClose={() => setDetail(null)} date={today()} mealId={suggestedMealId(profile)} meals={dayMeals} nutrientTargets={nutrientTargets} macroTargets={profile.targets} onDone={() => setDetail(null)} onEdit={(f) => { setDetail(null); if (f.source === "recipe" && f.recipeId) { const r = recipesLive?.find((x) => x.id === f.recipeId); if (r) setRecipe({ open: true, initial: r }); } else setCustom({ open: true, initial: f }); }} />
       <CustomFoodSheet open={custom.open} initial={custom.initial} onClose={() => setCustom({ open: false })} onSaved={() => setCustom({ open: false })} />
+      <RecipeUrlImport open={urlImport} onClose={() => setUrlImport(false)} onSaved={() => setUrlImport(false)} />
       <RecipeEditor open={recipe.open} initial={recipe.initial} onClose={() => setRecipe({ open: false })} onSaved={() => setRecipe({ open: false })} />
       <Confirm open={!!confirm} title={confirm?.kind === "recipe" ? "Delete this recipe?" : confirm?.kind === "meal" ? "Delete this saved meal?" : "Delete this food?"} body="Diary entries that already use it keep their nutrition." onCancel={() => setConfirm(null)} onConfirm={async () => {
         if (!confirm) return;

@@ -3,11 +3,13 @@ import { NUTRIENT_BY_KEY, formatAmount, netCarbs, type Nutrients, type NutrientK
 import { Bar, Segmented } from "@/components/ui";
 
 const GROUPS: { id: string; label: string; keys: NutrientKey[] }[] = [
-  { id: "general", label: "General", keys: ["kcal", "protein", "carbs", "fat", "fiber", "sugar", "addedSugar", "water", "alcohol", "caffeine"] },
-  { id: "lipids", label: "Lipids", keys: ["fat", "satFat", "monoFat", "polyFat", "transFat", "omega3", "cholesterol"] },
-  { id: "vitamins", label: "Vitamins", keys: ["vitA", "vitC", "vitD", "vitE", "vitK", "thiamin", "riboflavin", "niacin", "vitB6", "folate", "vitB12", "choline"] },
-  { id: "minerals", label: "Minerals", keys: ["sodium", "potassium", "calcium", "iron", "magnesium", "phosphorus", "zinc", "selenium"] },
+  { id: "general", label: "General", keys: ["kcal", "protein", "carbs", "fat", "fiber", "starch", "sugar", "addedSugar", "water", "alcohol", "caffeine"] },
+  { id: "lipids", label: "Lipids", keys: ["fat", "satFat", "monoFat", "polyFat", "transFat", "omega3", "omega6", "cholesterol"] },
+  { id: "vitamins", label: "Vitamins", keys: ["vitA", "vitC", "vitD", "vitE", "vitK", "thiamin", "riboflavin", "niacin", "pantothenicAcid", "vitB6", "folate", "vitB12", "choline"] },
+  { id: "minerals", label: "Minerals", keys: ["sodium", "potassium", "calcium", "iron", "magnesium", "phosphorus", "zinc", "copper", "manganese", "selenium"] },
+  { id: "amino", label: "Amino acids", keys: ["histidine", "isoleucine", "leucine", "lysine", "methionine", "cystine", "phenylalanine", "tyrosine", "threonine", "tryptophan", "valine", "arginine", "alanine", "asparticAcid", "glutamicAcid", "glycine", "proline", "serine"] },
 ];
+export const NUTRIENT_GROUPS = GROUPS;
 
 export function pctOf(value: number | undefined, target: number | undefined): number | null {
   if (!target || value === undefined) return null;

@@ -6,6 +6,13 @@ import { kgToUnit, unitToKg, fmt } from "@/lib/units";
 import { Sheet, Button, Field, NumberInput, Segmented, Toggle, useToast } from "@/components/ui";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const PRESETS: { id: string; label: string; pct: { protein: number; carbs: number; fat: number }; netCarbs?: number }[] = [
+  { id: "balanced", label: "Balanced 30/40/30", pct: { protein: 30, carbs: 40, fat: 30 } },
+  { id: "highprotein", label: "High protein 40/30/30", pct: { protein: 40, carbs: 30, fat: 30 } },
+  { id: "lowfat", label: "Low fat 25/55/20", pct: { protein: 25, carbs: 55, fat: 20 } },
+  { id: "keto", label: "Keto 25/5/70", pct: { protein: 25, carbs: 5, fat: 70 }, netCarbs: 25 },
+  { id: "zone", label: "Zone 30/40/30", pct: { protein: 30, carbs: 40, fat: 30 } },
+];
 
 export default function GoalsSheet({ open, onClose, profile, tdee, trendKg }: { open: boolean; onClose: () => void; profile: Profile; tdee: number; trendKg: number | null }) {
   const toast = useToast();
@@ -20,6 +27,7 @@ export default function GoalsSheet({ open, onClose, profile, tdee, trendKg }: { 
   const [pct, setPct] = useState({ protein: 30, carbs: 40, fat: 30 });
   const [weekday, setWeekday] = useState<Partial<Record<number, Partial<MacroTargets>>>>(profile.weekdayTargets ?? {});
   const [showWeekday, setShowWeekday] = useState(!!profile.weekdayTargets && Object.keys(profile.weekdayTargets).length > 0);
+  const [netCarbs, setNetCarbs] = useState<number | "">(profile.netCarbsTarget ?? "");
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +59,7 @@ export default function GoalsSheet({ open, onClose, profile, tdee, trendKg }: { 
       expenditureMode: mode, manualTdee: mode === "manual" ? Number(manual) || undefined : profile.manualTdee,
       targets: { kcal: Math.round(t.kcal), protein: Math.round(t.protein), carbs: Math.round(t.carbs), fat: Math.round(t.fat) },
       weekdayTargets: showWeekday ? weekday : undefined,
+      netCarbsTarget: netCarbs === "" ? undefined : Number(netCarbs),
     });
     toast("Goals saved"); onClose();
   }
@@ -83,6 +92,7 @@ export default function GoalsSheet({ open, onClose, profile, tdee, trendKg }: { 
         </div>
 
         <div className="flex items-center justify-between"><div className="text-[13px] font-semibold">Daily targets</div><Segmented value={byPct ? "pct" : "g"} onChange={(v) => setByPct(v === "pct")} options={[{ value: "g", label: "grams" }, { value: "pct", label: "%" }]} /></div>
+        <div className="scroll-x -mx-5 flex gap-2 px-5">{PRESETS.map((pr) => <button key={pr.id} onClick={() => { setPct(pr.pct); setByPct(true); setT(macrosFromPercent(t.kcal, pr.pct)); if (pr.netCarbs) setNetCarbs(pr.netCarbs); }} className="h-8 shrink-0 rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-ink-2">{pr.label}</button>)}</div>
         <Field label="Calories"><NumberInput value={t.kcal} onChange={(v) => { const kcal = Number(v) || 0; setT(byPct && pctSum === 100 ? macrosFromPercent(kcal, pct) : { ...t, kcal }); }} suffix="kcal" /></Field>
         {byPct ? (
           <div className="grid grid-cols-3 gap-2">
@@ -101,6 +111,7 @@ export default function GoalsSheet({ open, onClose, profile, tdee, trendKg }: { 
           {byPct && pctSum !== 100 ? `Percentages add up to ${pctSum} % — make it 100.` : `Macros add up to ${fmt(macroKcal)} kcal${Math.abs(macroKcal - t.kcal) > 60 ? ` (target is ${fmt(t.kcal)})` : ""} · protein ${(t.protein / Math.max(1, kgNow)).toFixed(1)} g/kg`}
         </div>
 
+        <Field label="Net carbs limit (optional, keto)" hint="Shown on Today when set. Net carbs = carbs − fiber."><NumberInput value={netCarbs} onChange={setNetCarbs} suffix="g" /></Field>
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2">
           <div><div className="text-[14px]">Different targets on some days</div><div className="text-[12px] text-ink-3">Calorie cycling: e.g. more carbs on training days.</div></div>
           <Toggle checked={showWeekday} onChange={setShowWeekday} label="Weekday targets" />

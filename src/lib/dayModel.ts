@@ -21,8 +21,8 @@ export function ageOf(p: Profile): number {
   return Math.max(14, new Date().getFullYear() - p.birthYear);
 }
 
-export function nutrientTargetsFor(p: Profile, kcal: number): Nutrients {
-  return { ...referenceTargets(p.sex, ageOf(p), kcal), ...(p.nutrientTargetOverrides ?? {}) };
+export function nutrientTargetsFor(p: Profile, kcal: number, kg?: number): Nutrients {
+  return { ...referenceTargets(p.sex, ageOf(p), kcal, kg ?? p.targetWeightKg ?? 70), ...(p.nutrientTargetOverrides ?? {}) };
 }
 
 export function useDay(date: ISODate, profile: Profile): DayModel {

@@ -54,7 +54,7 @@ function persist() {
 }
 process.on("SIGINT", () => { if (writeTimer) { clearTimeout(writeTimer); writeTimer = null; fs.writeFileSync(STORE, JSON.stringify(store)); } process.exit(0); });
 
-const COLLECTIONS = new Set(["foods", "recipes", "entries", "savedMeals", "water", "fasts", "weights", "measurements", "photos", "profile", "dayOverrides", "exercises", "programs", "workouts"]);
+const COLLECTIONS = new Set(["foods", "recipes", "entries", "savedMeals", "water", "fasts", "weights", "measurements", "photos", "profile", "dayOverrides", "exercises", "programs", "workouts", "biometrics"]);
 
 function rowCount() {
   let n = 0;
@@ -111,6 +111,33 @@ app.post("/api/sync", auth, (req, res) => {
   }
   if (accepted) persist();
   res.json({ seq: store.seq, changes: out, accepted });
+});
+
+// Fetch proxy for recipe import (browsers block cross-origin page fetches). Token-protected, small, short.
+app.get("/api/fetch", auth, async (req, res) => {
+  const url = String(req.query.url || "");
+  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: "http(s) url required" });
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    const r = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; Cronofree/1.0; +recipe import)", Accept: "text/html,application/xhtml+xml" } });
+    clearTimeout(t);
+    const text = (await r.text()).slice(0, 2_000_000);
+    res.json({ status: r.status, url: r.url, html: text });
+  } catch (e) {
+    res.status(502).json({ error: String(e.message || e) });
+  }
+});
+
+// Pre-compressed offline food pack (6+ MB raw, ~1 MB gzipped)
+app.get("/data/usda-pack.json", (req, res, next) => {
+  const gz = path.join(DIST, "data", "usda-pack.json.gz");
+  if (!fs.existsSync(gz) || !/\bgzip\b/.test(req.headers["accept-encoding"] || "")) return next();
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Content-Encoding", "gzip");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.setHeader("Vary", "Accept-Encoding");
+  fs.createReadStream(gz).pipe(res);
 });
 
 // Static app

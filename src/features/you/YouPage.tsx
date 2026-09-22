@@ -11,6 +11,10 @@ import { formatTime } from "@/lib/dates";
 import { PageHeader, Page } from "@/components/Shell";
 import { Button, Sheet, Field, Input, NumberInput, Segmented, Toggle, Confirm, useToast, Row } from "@/components/ui";
 import GoalsSheet from "./GoalsSheet";
+import NutrientTargetsSheet from "./NutrientTargetsSheet";
+import ImportSheet from "./ImportSheet";
+import { installUsdaPack, getPackInfo, type PackInfo } from "@/lib/usdaPack";
+import { mealIdFor } from "@/lib/dayModel";
 import { getTrainPrefs, setTrainPrefs, convertTrainingUnits, DEFAULT_TRAIN_PREFS, type TrainPrefs } from "@/features/train/trainRepo";
 import type { SourceSettings } from "@/lib/foodSources";
 
@@ -28,6 +32,8 @@ export default function YouPage() {
   const toast = useToast();
   const c = useCheckin(profile);
   const [goals, setGoals] = useState(false);
+  const [nutrientTargets, setNutrientTargets] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [prof, setProf] = useState(false);
   const [prefs, setPrefs] = useState(false);
   const [sync, setSync] = useState(false);
@@ -79,6 +85,10 @@ export default function YouPage() {
           <ChevronRight size={20} className="text-ink-3" />
         </button>
 
+        <Section icon={<Target size={18} />} title="Nutrient targets">
+          <Row label="Vitamins, minerals, amino acids" sub={`${(profile.trackedNutrients ?? []).length || 8} highlighted on Today · ${Object.keys(profile.nutrientTargetOverrides ?? {}).length} custom targets`} onClick={() => setNutrientTargets(true)} right={<ChevronRight size={18} className="text-ink-3" />} />
+        </Section>
+
         <Section icon={<UserRound size={18} />} title="Profile">
           <Row label="Body & activity" sub={`${profile.sex === "male" ? "Male" : "Female"} · born ${profile.birthYear} · ${Math.round(cmToUnit(profile.heightCm, profile.units.height))} ${profile.units.height} · ${ACTIVITY_LABELS[profile.activity].split(" · ")[0]}`} onClick={() => setProf(true)} right={<ChevronRight size={18} className="text-ink-3" />} />
         </Section>
@@ -99,6 +109,7 @@ export default function YouPage() {
         <Section icon={<Database size={18} />} title="Your data">
           <Row label="Download backup (JSON)" sub="Everything: foods, diary, weights, workouts, photos" onClick={doExport} />
           <Row label="Export diary (CSV)" sub="Every food entry with macros" onClick={doExportCsv} />
+          <Row label="Import from MyFitnessPal or Cronometer" sub="Their CSV exports become diary entries, weights and biometrics" onClick={() => setImportOpen(true)} />
           <Row label="Restore from backup" sub="Merges; newer records win" onClick={() => fileRef.current?.click()} />
           <Row label={<span className="text-bad">Erase data on this device</span>} sub="Your server copy is not touched" onClick={() => setConfirmWipe(true)} />
           <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={(e) => doImport(e.target.files?.[0])} />
@@ -112,6 +123,8 @@ export default function YouPage() {
         </Section>
       </Page>
 
+      <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} profile={profile} />
+      <NutrientTargetsSheet open={nutrientTargets} onClose={() => setNutrientTargets(false)} profile={profile} />
       <GoalsSheet open={goals} onClose={() => setGoals(false)} profile={profile} tdee={c?.currentTdee ?? 2200} trendKg={c?.trendKg ?? null} />
       <ProfileSheet open={prof} onClose={() => setProf(false)} profile={profile} />
       <PrefsSheet open={prefs} onClose={() => setPrefs(false)} profile={profile} />
@@ -149,11 +162,15 @@ function PrefsSheet({ open, onClose, profile }: { open: boolean; onClose: () => 
   const toast = useToast();
   const [p, setP] = useState(profile);
   const [meals, setMeals] = useState(profile.mealNames.join(", "));
-  useEffect(() => { if (open) { setP(profile); setMeals(profile.mealNames.join(", ")); } }, [open, profile]);
+  const [split, setSplit] = useState<Record<string, number | "">>({});
+  useEffect(() => { if (open) { setP(profile); setMeals(profile.mealNames.join(", ")); setSplit(profile.mealSplit ?? {}); } }, [open, profile]);
+  const splitSum = Object.values(split).reduce<number>((a, v) => a + (Number(v) || 0), 0);
   async function save() {
     const names = meals.split(",").map((s) => s.trim()).filter(Boolean);
     if (p.units.weight !== profile.units.weight) await convertTrainingUnits(profile.units.weight, p.units.weight);
-    await updateProfile({ units: p.units, mealNames: names.length ? names : profile.mealNames, waterGoalMl: p.waterGoalMl, fastingDefaultHours: p.fastingDefaultHours, theme: p.theme, startOfWeek: p.startOfWeek });
+    const mealSplit: Record<string, number> = {};
+    for (const [k, v] of Object.entries(split)) if (v !== "" && Number(v) > 0) mealSplit[k] = Number(v);
+    await updateProfile({ units: p.units, mealNames: names.length ? names : profile.mealNames, waterGoalMl: p.waterGoalMl, fastingDefaultHours: p.fastingDefaultHours, theme: p.theme, startOfWeek: p.startOfWeek, mealSplit: Object.keys(mealSplit).length ? mealSplit : undefined });
     toast("Preferences saved"); onClose();
   }
   return (
@@ -166,6 +183,11 @@ function PrefsSheet({ open, onClose, profile }: { open: boolean; onClose: () => 
           <Field label="Water"><Segmented value={p.units.volume} onChange={(v) => setP({ ...p, units: { ...p.units, volume: v } })} options={[{ value: "ml", label: "mL" }, { value: "oz", label: "fl oz" }]} className="w-full" /></Field>
         </div>
         <Field label="Meals (comma separated)" hint="Existing entries keep their meal; rename carefully."><Input value={meals} onChange={(e) => setMeals(e.target.value)} /></Field>
+        <Field label="Calorie split per meal (optional)" hint={splitSum ? `${splitSum}% assigned · shows a target next to each meal` : "Leave blank for no per-meal targets."}>
+          <div className="grid grid-cols-2 gap-2">
+            {meals.split(",").map((m) => m.trim()).filter(Boolean).map((m) => { const id = mealIdFor(m); return <NumberInput key={id} value={split[id] ?? ""} onChange={(v) => setSplit((s) => ({ ...s, [id]: v }))} suffix="%" placeholder={m} />; })}
+          </div>
+        </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field label="Water goal"><NumberInput value={p.waterGoalMl} onChange={(v) => setP({ ...p, waterGoalMl: Number(v) || 2000 })} suffix="mL" /></Field>
           <Field label="Default fast"><NumberInput value={p.fastingDefaultHours} onChange={(v) => setP({ ...p, fastingDefaultHours: Number(v) || 16 })} suffix="h" /></Field>
@@ -236,10 +258,17 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const toast = useToast();
   const [cfg, setCfg] = useState<SourceSettings>({ offEnabled: true, usdaEnabled: true, usdaApiKey: "" });
-  useEffect(() => { if (open) kvGet<SourceSettings>("foodSources", {}).then((c) => setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c })); }, [open]);
+  const [pack, setPack] = useState<PackInfo | null>(null);
+  const [installing, setInstalling] = useState<string | null>(null);
+  useEffect(() => { if (open) { kvGet<SourceSettings>("foodSources", {}).then((c) => setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c })); getPackInfo().then(setPack); } }, [open]);
   return (
     <Sheet open={open} onClose={onClose} title="Food sources" footer={<Button full variant="primary" onClick={async () => { await kvSet("foodSources", cfg); toast("Saved"); onClose(); }}>Save</Button>}>
       <div className="flex flex-col gap-3 text-[14px]">
+        <div className="rounded-xl bg-raised px-3 py-2">
+          <div className="flex items-center justify-between"><div><div>Offline USDA library</div><div className="text-[12px] text-ink-3">{pack ? `${pack.count.toLocaleString()} foods installed · ${pack.datasets.join(" + ")}` : "Not installed on this device"}</div></div>
+            <Button size="sm" disabled={!!installing} onClick={async () => { setInstalling("Installing…"); const r = await installUsdaPack({ force: true, onProgress: (d, t) => setInstalling(`${Math.round((d / t) * 100)}%`) }).catch(() => null); setPack(r); setInstalling(null); toast(r ? `Offline library ready · ${r.count.toLocaleString()} foods` : "No offline pack on this server. Run npm run usda.", r ? "ok" : "warn"); }}>{installing ?? (pack ? "Reinstall" : "Install")}</Button></div>
+          <div className="mt-1 text-[12px] text-ink-3">SR Legacy + Foundation Foods with household portions, vitamins, minerals and amino acids. Built with <code className="mono">npm run usda</code>.</div>
+        </div>
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>USDA FoodData Central</div><div className="text-[12px] text-ink-3">Whole foods with full vitamins & minerals</div></div><Toggle checked={cfg.usdaEnabled !== false} onChange={(v) => setCfg({ ...cfg, usdaEnabled: v })} /></div>
         <Field label="USDA API key (free)" hint="The shared DEMO_KEY allows ~30 searches an hour. Get your own in seconds at api.data.gov/signup."><Input value={cfg.usdaApiKey ?? ""} onChange={(e) => setCfg({ ...cfg, usdaApiKey: e.target.value })} autoCapitalize="none" spellCheck={false} placeholder="DEMO_KEY" /></Field>
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>Open Food Facts</div><div className="text-[12px] text-ink-3">Packaged products and barcodes, community data</div></div><Toggle checked={cfg.offEnabled !== false} onChange={(v) => setCfg({ ...cfg, offEnabled: v })} /></div>

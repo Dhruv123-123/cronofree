@@ -16,8 +16,11 @@ import { TrendChart, Columns } from "@/components/charts";
 import { Segmented, Stat, Button, Sheet, Confirm, NumberInput, Field, useToast, EmptyState, Chip } from "@/components/ui";
 import NutrientPanel from "@/features/diary/NutrientPanel";
 import { WeightSheet } from "@/features/diary/DiaryPage";
+import BiometricsSection from "./BiometricsSection";
+import CalendarTab from "./CalendarTab";
+import { NUTRIENTS, NUTRIENT_BY_KEY, type NutrientKey } from "@/lib/nutrients";
 
-type Tab = "weight" | "nutrition" | "body" | "photos";
+type Tab = "weight" | "nutrition" | "calendar" | "body" | "photos";
 const RANGES = [{ v: 14, l: "2w" }, { v: 30, l: "1m" }, { v: 90, l: "3m" }, { v: 365, l: "1y" }];
 
 export default function TrendsPage() {
@@ -26,11 +29,12 @@ export default function TrendsPage() {
     <>
       <PageHeader title="Trends" sub="Progress">
         <div className="px-4 pb-2 md:px-0">
-          <Segmented value={tab} onChange={setTab} className="w-full" options={[{ value: "weight", label: "Weight" }, { value: "nutrition", label: "Nutrition" }, { value: "body", label: "Body" }, { value: "photos", label: "Photos" }]} />
+          <Segmented value={tab} onChange={setTab} className="w-full" options={[{ value: "weight", label: "Weight" }, { value: "nutrition", label: "Food" }, { value: "calendar", label: "Calendar" }, { value: "body", label: "Body" }, { value: "photos", label: "Photos" }]} />
         </div>
       </PageHeader>
       {tab === "weight" && <WeightTab />}
       {tab === "nutrition" && <NutritionTab />}
+      {tab === "calendar" && <CalendarTab />}
       {tab === "body" && <BodyTab />}
       {tab === "photos" && <PhotosTab />}
     </>
@@ -107,6 +111,14 @@ function WeightTab() {
         )}
       </section>
 
+      {c && c.loggedDays30 > 0 && (
+        <section className="card p-4">
+          <h2 className="mb-1 text-[16px] font-semibold">Energy balance · 30 days</h2>
+          <p className="mb-2 text-[12px] text-ink-3">Daily intake against your current expenditure estimate. Bars below the line are a deficit.</p>
+          <Columns data={Array.from({ length: 30 }, (_, i) => { const d = addDays(today(), i - 29); return { date: d, kcal: Math.round(c.intakeByDay.get(d) ?? 0) }; })} dataKey="kcal" color="var(--accent)" refY={c.currentTdee} refLabel="expenditure" colorFor={(r) => (Number(r.kcal) === 0 ? "var(--line)" : Number(r.kcal) > c.currentTdee ? "var(--warn)" : "var(--protein)")} fmtValue={(v) => `${Math.round(v)} kcal`} />
+        </section>
+      )}
+
       {recent.length > 0 && (
         <section className="card px-4 py-2">
           <div className="divide-y divide-line">
@@ -141,6 +153,12 @@ function NutritionTab() {
   const t = profile.targets;
   const nutrientTargets = nutrientTargetsFor(profile, t.kcal);
   const adherence = series.filter((d) => d.kcal > 300).filter((d) => Math.abs(d.kcal - t.kcal) <= t.kcal * 0.1).length;
+  const [nk, setNk] = useState<NutrientKey>("fiber");
+  const nutrientSeries = useMemo(() => {
+    const byDay = new Map<string, number>();
+    for (const e of entries ?? []) { if (e.kind === "exercise") continue; byDay.set(e.date, (byDay.get(e.date) ?? 0) + (e.nutrients[nk] ?? 0)); }
+    return days.map((date) => ({ date, value: byDay.has(date) ? Math.round((byDay.get(date) ?? 0) * 100) / 100 : undefined }));
+  }, [entries, days, nk]);
 
   return (
     <Page>
@@ -160,6 +178,13 @@ function NutritionTab() {
         <h2 className="mb-2 text-[16px] font-semibold">Macros by day</h2>
         <TrendChart data={series.map((d) => ({ date: d.date, protein: d.kcal ? Math.round(d.protein) : undefined, carbs: d.kcal ? Math.round(d.carbs) : undefined, fat: d.kcal ? Math.round(d.fat) : undefined }))} series={[{ key: "protein", name: "Protein", color: "var(--protein)" }, { key: "carbs", name: "Carbs", color: "var(--carbs)" }, { key: "fat", name: "Fat", color: "var(--fat)" }]} unit="g" fmtValue={(v) => `${v} g`} />
         <div className="mt-1 flex gap-3 text-[11px] text-ink-3"><span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-[var(--protein)]" />Protein</span><span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-[var(--carbs)]" />Carbs</span><span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-[var(--fat)]" />Fat</span></div>
+      </section>
+      <section className="card p-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-[16px] font-semibold">Nutrient over time</h2>
+          <select value={nk} onChange={(e) => setNk(e.target.value as NutrientKey)} className="field !h-9 !w-auto !py-0 !text-[13px]">{NUTRIENTS.filter((n) => n.key !== "kcal").map((n) => <option key={n.key} value={n.key}>{n.label}</option>)}</select>
+        </div>
+        <TrendChart data={nutrientSeries} series={[{ key: "value", name: NUTRIENT_BY_KEY[nk].label, color: "var(--accent)", dot: true, area: true }]} refY={(nutrientTargets as Record<string, number | undefined>)[nk] ?? (t as unknown as Record<string, number | undefined>)[nk]} refLabel="target" fmtValue={(v) => `${v} ${NUTRIENT_BY_KEY[nk].unit}`} />
       </section>
       <section className="card p-4">
         <h2 className="mb-1 text-[16px] font-semibold">Nutrient report</h2>
@@ -209,6 +234,7 @@ function BodyTab() {
           ))}</div>
         )}
       </section>
+      <BiometricsSection />
       <Sheet open={open} onClose={() => setOpen(false)} title="Log measurements" footer={<Button full variant="primary" onClick={save}>Save</Button>}>
         <p className="mb-3 text-[13px] text-ink-2">Fill in any you measured today; leave the rest blank.</p>
         <div className="grid grid-cols-2 gap-2">

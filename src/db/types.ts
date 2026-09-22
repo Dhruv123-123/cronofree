@@ -115,6 +115,17 @@ export interface Measurement extends Base {
   cm: number;
 }
 
+export type BiometricKind = "bloodPressure" | "restingHr" | "sleep" | "glucose" | "ketones" | "bodyFat" | "steps" | "mood" | "energy" | "hrv" | "temperature";
+
+export interface Biometric extends Base {
+  date: ISODate;
+  at: number;
+  kind: BiometricKind;
+  value: number;
+  value2?: number; // diastolic for blood pressure
+  note?: string;
+}
+
 export interface Photo extends Base {
   date: ISODate;
   at: number;
@@ -155,6 +166,9 @@ export interface Profile extends Base {
   weekdayTargets?: Partial<Record<number, Partial<MacroTargets>>>;
   nutrientTargetOverrides?: Nutrients;
   trackedNutrients?: string[];
+  /** percent of daily calories per meal id, e.g. { breakfast: 25, lunch: 35 } */
+  mealSplit?: Record<string, number>;
+  netCarbsTarget?: number;
   mealNames: string[];
   units: { weight: "kg" | "lb"; height: "cm" | "in"; volume: "ml" | "oz" };
   startOfWeek: 0 | 1;
@@ -168,6 +182,7 @@ export interface DayTargetOverride extends Base {
   date: ISODate;
   targets: Partial<MacroTargets>;
   note?: string;
+  completed?: boolean;
 }
 
 /* ───────────────────────────── Train (LiftLog) ───────────────────────────── */
@@ -248,7 +263,7 @@ export interface WorkoutDraft {
 /* ───────────────────────────── Sync ───────────────────────────── */
 export type Collection =
   | "foods" | "recipes" | "entries" | "savedMeals" | "water" | "fasts" | "weights" | "measurements"
-  | "photos" | "profile" | "dayOverrides" | "exercises" | "programs" | "workouts";
+  | "photos" | "profile" | "dayOverrides" | "exercises" | "programs" | "workouts" | "biometrics";
 
 export interface Outbox {
   key: string; // `${collection}:${id}`

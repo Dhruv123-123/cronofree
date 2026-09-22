@@ -8,7 +8,7 @@ import { useProfile } from "@/hooks";
 import { useDay, mealsOf, suggestedMealId } from "@/lib/dayModel";
 import { addDays, today, formatDay, parseISODate } from "@/lib/dates";
 import { fmt, kgToUnit, unitToKg } from "@/lib/units";
-import { formatAmount, netCarbs } from "@/lib/nutrients";
+import { netCarbs } from "@/lib/nutrients";
 import { copyEntries, deleteEntry, saveMealFromEntries, mealTotals } from "@/lib/foodRepo";
 import { scheduleSync } from "@/lib/sync";
 import { uid } from "@/lib/id";
@@ -18,6 +18,11 @@ import AddFoodSheet from "./AddFoodSheet";
 import FoodDetailSheet from "./FoodDetailSheet";
 import NutrientPanel from "./NutrientPanel";
 import WaterCard from "./WaterCard";
+import ExerciseSheet from "./ExerciseSheet";
+import DayExtras from "./DayExtras";
+import { useCheckin } from "@/lib/checkin";
+import { NUTRIENT_BY_KEY, formatAmount, type NutrientKey } from "@/lib/nutrients";
+import { DEFAULT_TRACKED } from "@/features/you/NutrientTargetsSheet";
 import FastingCard from "./FastingCard";
 
 export default function DiaryPage() {
@@ -36,6 +41,10 @@ export default function DiaryPage() {
   const [confirmClear, setConfirmClear] = useState<string | null>(null);
   const [weightOpen, setWeightOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState<string | null>(null);
+  const [copyTo, setCopyTo] = useState<string | null>(null);
+  const [exercise, setExercise] = useState(false);
+  const checkin = useCheckin(profile);
+  const tracked = (profile.trackedNutrients ?? DEFAULT_TRACKED) as NutrientKey[];
 
   const weightToday = useLiveQuery(() => db.weights.where("date").equals(date).filter((w) => !w.deletedAt).first(), [date]);
   const lastWeight = useLiveQuery(() => db.weights.orderBy("at").reverse().filter((w) => !w.deletedAt).first(), []);
@@ -142,12 +151,33 @@ export default function DiaryPage() {
           <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
             <div><div className="tnum text-[15px] font-semibold">{fmt(eaten)}</div><div className="text-[11px] text-ink-3">eaten</div></div>
             <div><div className="tnum text-[15px] font-semibold">{fmt(day.targets.kcal)}{day.exerciseKcal > 0 && <span className="text-[12px] text-good"> +{fmt(day.exerciseKcal)}</span>}</div><div className="text-[11px] text-ink-3">target</div></div>
-            <div><div className="tnum text-[15px] font-semibold">{fmt(day.totals.fiber ?? 0)}<span className="text-[11px] font-normal text-ink-3"> / {day.nutrientTargets.fiber} g</span></div><div className="text-[11px] text-ink-3">fiber</div></div>
+            {profile.netCarbsTarget ? (
+              <div><div className={`tnum text-[15px] font-semibold ${netCarbs(day.totals) > profile.netCarbsTarget ? "text-bad" : ""}`}>{fmt(netCarbs(day.totals))}<span className="text-[11px] font-normal text-ink-3"> / {profile.netCarbsTarget} g</span></div><div className="text-[11px] text-ink-3">net carbs</div></div>
+            ) : (
+              <div><div className="tnum text-[15px] font-semibold">{fmt(day.totals.fiber ?? 0)}<span className="text-[11px] font-normal text-ink-3"> / {day.nutrientTargets.fiber} g</span></div><div className="text-[11px] text-ink-3">fiber</div></div>
+            )}
           </div>
           <button onClick={() => setShowNutrients((s) => !s)} className="mt-3 flex w-full items-center justify-between text-[13px] font-medium text-ink-2">
             <span>All nutrients · net carbs {formatAmount("carbs", netCarbs(day.totals))} g · sodium {formatAmount("sodium", day.totals.sodium)} mg</span>
             {showNutrients ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
+          {!showNutrients && tracked.length > 0 && (
+            <div className="scroll-x -mx-4 mt-3 flex gap-2 px-4">
+              {tracked.map((k) => {
+                const def = NUTRIENT_BY_KEY[k]; if (!def) return null;
+                const v = day.totals[k] ?? 0; const t = day.nutrientTargets[k];
+                const pct = t ? Math.min(100, (v / t) * 100) : 0;
+                const color = !t ? "var(--ink-3)" : def.limit ? (v > t ? "var(--bad)" : v > t * 0.8 ? "var(--warn)" : "var(--good)") : pct >= 100 ? "var(--good)" : pct >= 50 ? "var(--accent)" : "var(--warn)";
+                return (
+                  <div key={k} className="w-[92px] shrink-0 rounded-xl bg-raised px-2.5 py-2">
+                    <div className="truncate text-[11px] text-ink-3">{def.short}</div>
+                    <div className="tnum text-[13px] font-semibold">{formatAmount(k, v)}<span className="text-[10px] font-normal text-ink-3"> / {t !== undefined ? formatAmount(k, t) : "–"}</span></div>
+                    <Bar value={v} max={t ?? 1} color={color} height={3} className="mt-1" />
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {showNutrients && <div className="mt-3 border-t border-line pt-3"><NutrientPanel totals={day.totals} targets={day.nutrientTargets} macroTargets={day.targets} /></div>}
         </section>
 
@@ -167,7 +197,7 @@ export default function DiaryPage() {
             <section key={m.id} className="card overflow-hidden">
               <div className="flex items-center gap-2 px-4 pt-3 pb-1">
                 <h2 className="flex-1 text-[16px] font-semibold">{m.name}</h2>
-                {items.length > 0 && <span className="tnum text-[13px] text-ink-2">{fmt(t.kcal)} kcal</span>}
+                {(items.length > 0 || profile.mealSplit?.[m.id]) && <span className="tnum text-[13px] text-ink-2">{fmt(t.kcal)}{profile.mealSplit?.[m.id] ? <span className="text-ink-3"> / {fmt((day.targets.kcal * (profile.mealSplit[m.id] ?? 0)) / 100)}</span> : ""} kcal</span>}
                 <IconButton label="Meal options" onClick={() => setMenu(m.id)} className="-mr-2 h-9 w-9"><MoreHorizontal size={18} /></IconButton>
               </div>
               {items.length > 0 && (
@@ -209,9 +239,14 @@ export default function DiaryPage() {
             </div>
           </section>
         )}
+        <button onClick={() => setExercise(true)} className="flex items-center gap-3 rounded-2xl border border-dashed border-line-strong px-4 py-3 text-left">
+          <Flame size={20} className="text-ink-3" />
+          <div className="flex-1 text-[14px]"><span className="font-medium">Add exercise</span><div className="text-[12px] text-ink-3">Pick an activity and duration, or enter calories from your watch. Widens today's budget.</div></div>
+          <Plus size={18} className="text-accent" />
+        </button>
         <WaterCard date={date} profile={profile} />
         <FastingCard profile={profile} />
-        <ExerciseQuickAdd date={date} />
+        <DayExtras date={date} day={day} profile={profile} expenditure={checkin?.currentTdee ?? day.targets.kcal} />
       </Page>
 
       {/* FAB (mobile) */}
@@ -227,6 +262,7 @@ export default function DiaryPage() {
         <div className="flex flex-col gap-1">
           <MenuItem icon={<Copy size={18} />} label="Copy from yesterday" sub="Same meal, previous day" onClick={() => menu && doCopyMeal(menu, addDays(date, -1))} />
           <MenuItem icon={<CalendarDays size={18} />} label="Copy from another day…" onClick={() => { setCopyFrom(menu); setMenu(null); }} />
+          <MenuItem icon={<Copy size={18} />} label="Copy this meal to a date…" disabled={!(day.byMeal[menu ?? ""]?.length)} onClick={() => { setCopyTo(menu); setMenu(null); }} />
           <MenuItem icon={<Save size={18} />} label="Save as meal" sub="Reuse this whole meal later" disabled={!(day.byMeal[menu ?? ""]?.length)} onClick={() => { const m = meals.find((x) => x.id === menu)!; setSaveMeal({ mealId: m.id, name: `${m.name} · ${formatDay(date, { relative: false })}` }); setMenu(null); }} />
           <MenuItem icon={<Copy size={18} />} label="Copy whole day from yesterday" onClick={() => doCopyDay(addDays(date, -1))} />
           <MenuItem icon={<Trash2 size={18} />} label="Clear meal" danger disabled={!(day.byMeal[menu ?? ""]?.length)} onClick={() => setConfirmClear(menu)} />
@@ -240,6 +276,14 @@ export default function DiaryPage() {
           ))}
         </div>
       </Sheet>
+
+      <Sheet open={!!copyTo} onClose={() => setCopyTo(null)} title="Copy meal to which day?">
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3].map((n) => <Button key={n} onClick={async () => { const items = day.byMeal[copyTo!] ?? []; const c = await copyEntries(items, addDays(date, n), copyTo!); toast(`Copied ${c} items to ${formatDay(addDays(date, n))}`); setCopyTo(null); }} className="justify-start">{formatDay(addDays(date, n))}</Button>)}
+          <label className="text-[13px] text-ink-2">Or pick a date<input type="date" className="field mt-1" onChange={async (e) => { if (!e.target.value) return; const items = day.byMeal[copyTo!] ?? []; const c = await copyEntries(items, e.target.value, copyTo!); toast(`Copied ${c} items to ${formatDay(e.target.value)}`); setCopyTo(null); }} /></label>
+        </div>
+      </Sheet>
+      <ExerciseSheet open={exercise} onClose={() => setExercise(false)} date={date} />
 
       <Sheet open={!!saveMeal} onClose={() => setSaveMeal(null)} title="Save as meal">
         <Input autoFocus value={saveMeal?.name ?? ""} onChange={(e) => setSaveMeal((s) => s && { ...s, name: e.target.value })} />
@@ -274,33 +318,5 @@ export function WeightSheet({ open, onClose, unit, initial, onSave, title = "Log
       </div>
       <Button full variant="primary" className="mt-4" disabled={!v} onClick={() => v && onSave(Number(v))}>Save</Button>
     </Sheet>
-  );
-}
-
-/** Small "Exercise" card: add burned calories that widen today's budget. */
-function ExerciseQuickAdd({ date }: { date: string }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [kcal, setKcal] = useState<number | "">("");
-  const toast = useToast();
-  return (
-    <>
-      <button onClick={() => setOpen(true)} className="flex items-center gap-3 rounded-2xl border border-dashed border-line-strong px-4 py-3 text-left">
-        <Flame size={20} className="text-ink-3" />
-        <div className="flex-1 text-[14px]"><span className="font-medium">Add exercise calories</span><div className="text-[12px] text-ink-3">Optional. Adds to today's budget (workouts from Train are not counted automatically).</div></div>
-        <Plus size={18} className="text-accent" />
-      </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Exercise calories">
-        <div className="flex flex-col gap-3">
-          <Input placeholder="e.g. 5 km run" value={name} onChange={(e) => setName(e.target.value)} />
-          <NumberInput value={kcal} onChange={setKcal} suffix="kcal" placeholder="Calories burned" />
-          <Button full variant="primary" disabled={!kcal} onClick={async () => {
-            const { logQuick } = await import("@/lib/foodRepo");
-            await logQuick({ date, mealId: "exercise", name: name.trim() || "Exercise", nutrients: { kcal: Number(kcal) }, kind: "exercise" });
-            toast("Exercise added"); setOpen(false); setName(""); setKcal("");
-          }}>Add</Button>
-        </div>
-      </Sheet>
-    </>
   );
 }

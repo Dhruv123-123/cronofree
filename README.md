@@ -36,6 +36,19 @@ npm test           # unit tests for the nutrition, energy, lifting and food-sour
 npm run typecheck
 ```
 
+### Offline food database
+
+The repo ships `public/data/usda-pack.json`: **8,122 USDA foods** (SR Legacy + Foundation Foods) with per-100 g values for 60+ nutrients including amino acids, plus household portions with gram weights (1 medium banana 118 g, ½ breast 86 g, 1 cup cooked rice 158 g…). It installs into the phone's IndexedDB on first launch (about 1.2 MB over the wire) so search, the nutrient finder and recipes work with no network at all.
+
+Rebuild or extend it any time:
+
+```bash
+npm run usda              # SR Legacy + Foundation Foods
+npm run usda -- --survey  # also FNDDS survey foods (~5,400 prepared dishes and restaurant-style items)
+```
+
+The script downloads the official FoodData Central releases, cleans portions, and writes the pack (and a pre-gzipped twin the server streams). Anything not in the pack is still one search away online, and packaged products come from Open Food Facts by barcode.
+
 ### Where the data lives
 
 - **On each device:** IndexedDB (via Dexie). Photos are compressed JPEGs stored inline.
@@ -65,10 +78,17 @@ The server is plain HTTP, which is fine on your LAN. To use it from anywhere, pu
 | **Quick add** | Calories or macros without a food (calories are computed from macros if left blank). |
 | **Copy** | Copy a meal from yesterday or any of the last 7 days; copy a whole day. |
 | **Recents / Frequent / Favorites / My foods** | Every list the big apps have, without the paywall. |
-| **Micronutrients** | Cronometer-style report: 36 nutrients incl. fibre, sugars, added sugar, sat/mono/poly/trans fat, omega-3, cholesterol, sodium, potassium, calcium, iron, magnesium, phosphorus, zinc, selenium, vitamins A, C, D, E, K, B1, B2, B3, B6, B12, folate, choline, caffeine, alcohol, water. Targets are the adult DRIs for your sex and age; limit nutrients use the Dietary Guidelines. Missing data shows as missing, never as zero. |
+| **Micronutrients** | Cronometer-style report: 60+ nutrients incl. 18 amino acids, copper, manganese, B5, omega-6, starch, fibre, sugars, added sugar, sat/mono/poly/trans fat, omega-3, cholesterol, sodium, potassium, calcium, iron, magnesium, phosphorus, zinc, selenium, vitamins A, C, D, E, K, B1, B2, B3, B6, B12, folate, choline, caffeine, alcohol, water. Targets are the adult DRIs for your sex and age; limit nutrients use the Dietary Guidelines. Missing data shows as missing, never as zero. |
 | **Water** | One-tap glasses with a goal, in mL or fl oz. |
 | **Fasting timer** | 12/14/16/18/20/24 h windows, runs in the background, history and average length. |
-| **Exercise calories** | Optional entries that widen the day's budget. |
+| **Exercise** | 80-activity MET database (Compendium of Physical Activities): pick an activity and minutes, calories from your body weight; or enter calories from a watch. Widens the day's budget. |
+| **Nutrient finder** | Cronometer's "Oracle": rank every food on the device by any nutrient, per 100 kcal, per 100 g or per serving, filtered by category. |
+| **Custom nutrient targets** | Override any DRI, and choose which nutrients appear as highlight tiles on Today. |
+| **Multi-add** | Tick several recents or favourites and add them in one go. |
+| **Per-meal targets** | Optional calorie split per meal, shown in each meal header. |
+| **Day notes & Complete day** | Notes per day; "Complete day" shows MyFitnessPal's five-week projection from today's balance. |
+| **Copy** | Copy a meal from any recent day, copy a meal to a future date, copy a whole day. |
+| **Time stamps** | Every entry carries the time it was eaten; editable. |
 
 ### Goals and adaptive targets
 - Onboarding estimates maintenance with **Mifflin-St Jeor** and builds macros (protein by body weight, fat ~27 %, carbs fill).
@@ -78,12 +98,15 @@ The server is plain HTTP, which is fine on your LAN. To use it from anywhere, pu
 - Targets in grams or percentages, **different targets per weekday** (calorie cycling / training days), and per-day overrides.
 
 ### Body
+- **Biometrics**: blood pressure, resting heart rate, HRV, sleep, steps, body fat, blood glucose, ketones, temperature, mood, energy, with charts.
 - Daily weigh-ins with an exponentially smoothed **trend weight** (like Happy Scale / MacroFactor) and 2-week rate vs goal.
 - Ten tape measurements with charts.
 - Progress photos: first-vs-latest comparison and an evenly spaced timeline, attachable to workouts.
 
 ### Insights (Trends)
 - Calories by day coloured by adherence, macro lines, 7/14/30/90-day averages, days within ±10 %.
+- Any nutrient over time against its target; energy balance (intake vs expenditure) for 30 days.
+- Calendar with logging streaks, adherence colouring and workout dots.
 - Nutrient report averaged over logged days against your targets.
 
 ### Train (LiftLog, rebuilt)
@@ -95,6 +118,9 @@ Everything the original does, redesigned:
 - **Stats**: e1RM (Epley) / top weight / volume per exercise, weekly volume over 12 weeks, sets per muscle group this week, week streak.
 - kg ↔ lb switch converts logged weights.
 
+### Importing from the apps you're leaving
+You → Your data → *Import*. Drop in MyFitnessPal's `Nutrition-Summary.csv` / `Measurement-Summary.csv` or Cronometer's `servings.csv` / `biometrics.csv` / `dailysummary.csv`; they become ordinary entries, weights and biometrics. Recipes can be imported from any recipe URL (schema.org data) with each ingredient matched to a food for you to confirm.
+
 ### Sync
 - Every write lands in IndexedDB and an outbox; `POST /api/sync` pushes the outbox and pulls everything newer than the last server sequence. Conflicts resolve last-writer-wins; deletes are tombstones, so nothing resurrects.
 - Single-file Node server (`server/index.mjs`, Express), bearer-token auth, serves the built app on the same origin. Change the port with `PORT`, the token with `CRONOFREE_TOKEN`, the data folder with `CRONOFREE_DATA_DIR`.
@@ -105,8 +131,8 @@ Everything the original does, redesigned:
 
 | App | Best at | In Cronofree |
 |---|---|---|
-| **MyFitnessPal** | Enormous food database, barcode scanning, recipes, meals, copy yesterday, quick add, streak-friendly diary | Open Food Facts + USDA search, barcode scanner, recipes, saved meals, copy meal/day, quick add. Per-weekday goals and net carbs are premium in MFP; free here. |
-| **Cronometer** | Micronutrient depth with DRI targets, verified USDA data, fasting timer, biometrics, nutrient report | 36-nutrient report with DRI targets on every day and averaged over any range, USDA whole foods as a first-class source, fasting timer, weight/measurements. |
+| **MyFitnessPal** | Enormous food database, barcode scanning, recipes, meals, copy yesterday, quick add, multi-add, exercise database, streaks, "complete diary" projection, per-meal goals, recipe importer | Offline USDA pack + Open Food Facts + live USDA search, barcode scanner, recipes (incl. from URL), saved meals, copy meal/day/to-date, quick add, multi-add, MET exercise database, calendar streaks, complete-day projection, per-meal calorie split. Per-weekday goals, net carbs and food time stamps are premium in MFP; free here. |
+| **Cronometer** | Micronutrient depth (incl. amino acids) with DRI targets, custom targets, Oracle, verified USDA data, fasting timer, biometrics, nutrient trends, notes | 60+-nutrient report with DRI targets, custom targets and highlight tiles, nutrient finder, USDA whole foods offline, fasting timer, 11 biometric types with charts, nutrient-over-time charts, day notes, Cronometer CSV import. |
 | **MacroFactor** | Adaptive expenditure from intake + weight trend, weekly check-in that updates targets, trend weight, fast logging | Same energy-balance approach with a rolling window and confidence shrinkage, weekly check-in with one-tap apply, EMA trend weight, keyboard-first food detail with big kcal and tap-to-add. |
 | **Lose It!** | Simple budget framing, water, patterns | Calorie budget ring with "left/over", water glasses, adherence stats. |
 | **Carbon / RP** | Coaching-style adjustments, refeeds, calorie cycling | Weekday targets for cycling, adaptive weekly adjustments. |
@@ -115,7 +141,7 @@ Everything the original does, redesigned:
 | **LiftLog** | The lifting logic: smart targets, plateau detection, drafts, PRs | Ported function-for-function; UI rebuilt. |
 
 ### What was deliberately left out
-- Social feeds, community food entries (quality problems), streak gamification, AI photo-to-calories (accuracy too poor to be worth the plumbing), and any cloud account.
+- Social feeds and friends, community food entries (quality problems), AI photo-to-calories (accuracy too poor to be worth the plumbing), push-notification reminders (unreliable in installed web apps on iOS), automatic wearable sync (Apple Health, Garmin, Fitbit have no web APIs; import their CSVs or log biometrics by hand), kilojoule display, and any cloud account.
 
 ---
 
@@ -131,6 +157,11 @@ src/
     foodRepo.ts    search ranking, logging, custom foods, recipes, saved meals
     energy.ts      Mifflin-St Jeor, targets, EMA weight trend, adaptive expenditure
     checkin.ts     weekly check-in model
+    exerciseDb.ts  MET activity database
+    biometrics.ts  biometric kinds and formatting
+    csv.ts / importers.ts   MyFitnessPal & Cronometer importers
+    ingredientParse.ts / recipeImport.ts   recipe-from-URL
+    usdaPack.ts    offline USDA pack installer
     lifting.ts     e1RM, history, smart targets, plateau, PRs
     sync.ts        outbox sync engine, export/import
   features/      diary · foods · train · trends · you · onboarding
