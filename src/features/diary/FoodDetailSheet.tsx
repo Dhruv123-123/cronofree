@@ -7,7 +7,7 @@ import { Sheet, Button, Chip, Segmented, NumberInput, useToast } from "@/compone
 import NutrientPanel from "./NutrientPanel";
 import { fmt } from "@/lib/units";
 
-export const SOURCE_LABEL: Record<Food["source"], string> = { seed: "Starter", custom: "My food", off: "Open Food Facts", usda: "USDA", recipe: "Recipe" };
+export const SOURCE_LABEL: Record<Food["source"], string> = { seed: "Starter", custom: "My food", off: "Open Food Facts", usda: "USDA", recipe: "Recipe", restaurant: "Restaurant" };
 
 const GRAMS_ID = "__grams";
 
@@ -91,7 +91,8 @@ export default function FoodDetailSheet({ food, open, onClose, date, mealId, mea
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-3">
             {food.brand && <span>{food.brand}</span>}
             <Chip className="!h-6 !px-2 !text-[11px]">{SOURCE_LABEL[food.source]}</Chip>
-            {food.verified && <span>verified</span>}
+            {food.source === "restaurant" ? <Chip tone={food.basis === "published" ? "good" : "warn"} className="!h-6 !px-2 !text-[11px]">{food.basis === "published" ? "published nutrition" : "estimated"}</Chip> : food.verified && <span>verified</span>}
+            {food.vegan && <Chip tone="good" className="!h-6 !px-2 !text-[11px]">vegan</Chip>}
           </div>
         </div>
         <div className="flex shrink-0 items-center">
@@ -102,6 +103,7 @@ export default function FoodDetailSheet({ food, open, onClose, date, mealId, mea
         </div>
       </div>
 
+      {food.note && <p className="mt-3 whitespace-pre-line rounded-xl bg-raised px-3 py-2 text-[12px] text-ink-2">{food.note}</p>}
       <div className="mt-4 flex items-center gap-2">
         {servingId !== GRAMS_ID ? (
           <div className="flex h-11 items-center rounded-xl bg-raised">

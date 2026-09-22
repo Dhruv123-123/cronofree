@@ -14,6 +14,7 @@ import GoalsSheet from "./GoalsSheet";
 import NutrientTargetsSheet from "./NutrientTargetsSheet";
 import ImportSheet from "./ImportSheet";
 import { installUsdaPack, getPackInfo, type PackInfo } from "@/lib/usdaPack";
+import { installRestaurantPack, getRestaurantInfo, type RestaurantInfo } from "@/lib/restaurantPack";
 import { mealIdFor } from "@/lib/dayModel";
 import { getTrainPrefs, setTrainPrefs, convertTrainingUnits, DEFAULT_TRAIN_PREFS, type TrainPrefs } from "@/features/train/trainRepo";
 import type { SourceSettings } from "@/lib/foodSources";
@@ -259,8 +260,9 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const toast = useToast();
   const [cfg, setCfg] = useState<SourceSettings>({ offEnabled: true, usdaEnabled: true, usdaApiKey: "" });
   const [pack, setPack] = useState<PackInfo | null>(null);
+  const [rest, setRest] = useState<RestaurantInfo | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
-  useEffect(() => { if (open) { kvGet<SourceSettings>("foodSources", {}).then((c) => setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c })); getPackInfo().then(setPack); } }, [open]);
+  useEffect(() => { if (open) { kvGet<SourceSettings>("foodSources", {}).then((c) => setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c })); getPackInfo().then(setPack); getRestaurantInfo().then(setRest); } }, [open]);
   return (
     <Sheet open={open} onClose={onClose} title="Food sources" footer={<Button full variant="primary" onClick={async () => { await kvSet("foodSources", cfg); toast("Saved"); onClose(); }}>Save</Button>}>
       <div className="flex flex-col gap-3 text-[14px]">
@@ -268,6 +270,11 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <div className="flex items-center justify-between"><div><div>Offline USDA library</div><div className="text-[12px] text-ink-3">{pack ? `${pack.count.toLocaleString()} foods installed · ${pack.datasets.join(" + ")}` : "Not installed on this device"}</div></div>
             <Button size="sm" disabled={!!installing} onClick={async () => { setInstalling("Installing…"); const r = await installUsdaPack({ force: true, onProgress: (d, t) => setInstalling(`${Math.round((d / t) * 100)}%`) }).catch(() => null); setPack(r); setInstalling(null); toast(r ? `Offline library ready · ${r.count.toLocaleString()} foods` : "No offline pack on this server. Run npm run usda.", r ? "ok" : "warn"); }}>{installing ?? (pack ? "Reinstall" : "Install")}</Button></div>
           <div className="mt-1 text-[12px] text-ink-3">SR Legacy + Foundation Foods with household portions, vitamins, minerals and amino acids. Built with <code className="mono">npm run usda</code>.</div>
+        </div>
+        <div className="rounded-xl bg-raised px-3 py-2">
+          <div className="flex items-center justify-between"><div><div>Eat out · Berkeley & SF</div><div className="text-[12px] text-ink-3">{rest ? `${rest.restaurants} restaurants · ${rest.items} vegetarian items` : "Not installed"}</div></div>
+            <Button size="sm" onClick={async () => { const r = await installRestaurantPack({ force: true }).catch(() => null); setRest(r); toast(r ? `Restaurants ready · ${r.items} items` : "No restaurant pack on this server.", r ? "ok" : "warn"); }}>{rest ? "Reinstall" : "Install"}</Button></div>
+          <div className="mt-1 text-[12px] text-ink-3">Edit <code className="mono">data/restaurants/*.json</code> and run <code className="mono">npm run restaurants</code> to add places.</div>
         </div>
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>USDA FoodData Central</div><div className="text-[12px] text-ink-3">Whole foods with full vitamins & minerals</div></div><Toggle checked={cfg.usdaEnabled !== false} onChange={(v) => setCfg({ ...cfg, usdaEnabled: v })} /></div>
         <Field label="USDA API key (free)" hint="The shared DEMO_KEY allows ~30 searches an hour. Get your own in seconds at api.data.gov/signup."><Input value={cfg.usdaApiKey ?? ""} onChange={(e) => setCfg({ ...cfg, usdaApiKey: e.target.value })} autoCapitalize="none" spellCheck={false} placeholder="DEMO_KEY" /></Field>

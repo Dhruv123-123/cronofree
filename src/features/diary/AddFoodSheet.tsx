@@ -13,8 +13,10 @@ import QuickAddSheet from "./QuickAddSheet";
 import BarcodeScanner from "./BarcodeScanner";
 import CustomFoodSheet from "@/features/foods/CustomFoodSheet";
 import { subscribePack, type PackProgress } from "@/lib/usdaPack";
+import EatOut from "@/features/foods/EatOut";
+import { MapPin } from "lucide-react";
 
-type Tab = "recent" | "frequent" | "favorites" | "mine" | "meals" | "recipes";
+type Tab = "recent" | "frequent" | "favorites" | "eatout" | "mine" | "meals" | "recipes";
 
 export function FoodRow({ food, onClick, trailing }: { food: Food; onClick: () => void; trailing?: React.ReactNode }) {
   const s = defaultServing(food);
@@ -119,6 +121,7 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
     { id: "recent", label: "Recent", icon: <Clock size={14} /> },
     { id: "frequent", label: "Frequent", icon: <Repeat size={14} /> },
     { id: "favorites", label: "Favorites", icon: <Star size={14} /> },
+    { id: "eatout", label: "Eat out", icon: <MapPin size={14} /> },
     { id: "meals", label: "Meals", icon: <UtensilsCrossed size={14} /> },
     { id: "recipes", label: "Recipes", icon: <ChefHat size={14} /> },
     { id: "mine", label: "My foods", icon: <PlusCircle size={14} /> },
@@ -166,7 +169,7 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
             </>
           ) : (
             <>
-              {tab === "meals" ? (
+              {tab === "eatout" ? <div className="pt-3"><EatOut compact onPick={(f) => setDetail(f)} /></div> : tab === "meals" ? (
                 lists?.meals.length ? (
                   <div className="divide-y divide-line">
                     {lists.meals.map((m) => {

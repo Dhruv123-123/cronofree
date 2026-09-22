@@ -12,6 +12,7 @@
     "serve": "node server/index.mjs",
     "start": "npm run build && node server/index.mjs",
     "test": "node --experimental-strip-types --no-warnings --test tests/*.test.mjs",
+    "restaurants": "node --experimental-strip-types --no-warnings scripts/build-restaurant-pack.mjs",
     "usda": "node --experimental-strip-types --no-warnings --max-old-space-size=8192 scripts/build-usda-pack.mjs"
   },
   "dependencies": {

@@ -16,7 +16,7 @@ export interface Serving {
   grams: number;
 }
 
-export type FoodSource = "custom" | "seed" | "off" | "usda" | "recipe";
+export type FoodSource = "custom" | "seed" | "off" | "usda" | "recipe" | "restaurant";
 
 export interface Food extends Base {
   name: string;
@@ -34,6 +34,11 @@ export interface Food extends Base {
   useCount?: number;
   lastUsedAt?: number;
   recipeId?: string;
+  /** free text shown on the detail sheet: what's in it, source, caveats */
+  note?: string;
+  /** restaurant items: numbers from the restaurant ("published") or estimated from the menu */
+  basis?: "published" | "estimated";
+  vegan?: boolean;
   /** search helper: lowercased name + brand */
   search: string;
 }

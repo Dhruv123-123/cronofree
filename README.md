@@ -49,6 +49,18 @@ npm run usda -- --survey  # also FNDDS survey foods (~5,400 prepared dishes and 
 
 The script downloads the official FoodData Central releases, cleans portions, and writes the pack (and a pre-gzipped twin the server streams). Anything not in the pack is still one search away online, and packaged products come from Open Food Facts by barcode.
 
+### Eat out: Berkeley campus + select SF, vegetarian only
+
+Foods → **Eat out** (also a tab inside *Add food*) lists vegetarian orders from restaurants around UC Berkeley (Telegraph/Durant/Shattuck, Cal Dining halls, campus cafés) and select San Francisco spots, so a burrito bowl or a slice is one tap. Each item is labelled **published** (numbers from the restaurant's own nutrition info, with the source page in the item's note) or **estimated** (worked out from the menu description). Search also finds them by dish or restaurant ("chipotle sofritas", "cheese board").
+
+The data lives in `data/restaurants/*.json` (one file per batch, plain JSON you can edit) and is merged by:
+
+```bash
+npm run restaurants   # validates vegetarian-ness and macro/calorie consistency, writes public/data/restaurants.json
+```
+
+The app installs the pack on launch and refreshes it whenever the file changes.
+
 ### Where the data lives
 
 - **On each device:** IndexedDB (via Dexie). Photos are compressed JPEGs stored inline.

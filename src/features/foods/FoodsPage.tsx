@@ -15,10 +15,11 @@ import FoodDetailSheet from "@/features/diary/FoodDetailSheet";
 import CustomFoodSheet from "./CustomFoodSheet";
 import RecipeEditor from "./RecipeEditor";
 import NutrientFinder from "./NutrientFinder";
+import EatOut from "./EatOut";
 import RecipeUrlImport from "./RecipeUrlImport";
 import { Link2 } from "lucide-react";
 
-type Tab = "browse" | "mine" | "recipes" | "meals" | "find";
+type Tab = "browse" | "eatout" | "mine" | "recipes" | "meals" | "find";
 
 export default function FoodsPage() {
   const profile = useProfile();
@@ -68,7 +69,7 @@ export default function FoodsPage() {
         </div>
       }>
         <div className="px-4 pb-2 md:px-0">
-          <Segmented value={tab} onChange={setTab} className="w-full" options={[{ value: "browse", label: "Browse" }, { value: "find", label: "Find" }, { value: "mine", label: "Mine" }, { value: "recipes", label: "Recipes" }, { value: "meals", label: "Meals" }]} />
+          <Segmented value={tab} onChange={setTab} className="w-full" options={[{ value: "browse", label: "All" }, { value: "eatout", label: "Eat out" }, { value: "find", label: "Find" }, { value: "mine", label: "Mine" }, { value: "recipes", label: "Recipes" }, { value: "meals", label: "Meals" }]} />
         </div>
       </PageHeader>
       <Page>
@@ -96,6 +97,7 @@ export default function FoodsPage() {
         )}
 
         {tab === "find" && <NutrientFinder onPick={(f) => setDetail(f)} />}
+        {tab === "eatout" && <EatOut onPick={(f) => setDetail(f)} />}
 
         {tab === "mine" && (
           <div className="card divide-y divide-line px-4">
