@@ -43,11 +43,22 @@ The repo ships `public/data/usda-pack.json`: **8,122 USDA foods** (SR Legacy + F
 Rebuild or extend it any time:
 
 ```bash
-npm run usda              # SR Legacy + Foundation Foods
-npm run usda -- --survey  # also FNDDS survey foods (~5,400 prepared dishes and restaurant-style items)
+npm run usda      # SR Legacy + Foundation + FNDDS
+npm run branded   # public/data/branded-pack.json: most-scanned US products of 200+ brands from Open Food Facts, vegetarian-filtered (≈30 min, polite to their rate limit)
 ```
 
 The script downloads the official FoodData Central releases, cleans portions, and writes the pack (and a pre-gzipped twin the server streams). Anything not in the pack is still one search away online, and packaged products come from Open Food Facts by barcode.
+
+### AI assistant (bring your own Azure OpenAI or OpenAI key)
+
+You → **AI assistant**: paste an Azure OpenAI endpoint + deployment + key (or an OpenAI / OpenAI-compatible key). A cheap model is plenty (gpt-4o-mini, gpt-4.1-mini, gpt-5-mini). Two things turn on:
+
+- **Ask AI** appears under every search. The model looks the item up, using its web search tool when the deployment supports it (Responses API `web_search_preview`, or OpenAI's `gpt-4o-mini-search-preview`), and returns per-serving calories and macros with a source link and a confidence label. "Save & add" keeps it in My foods.
+- **Describe a meal**: "two eggs with cheddar, sourdough toast with butter, 16 oz oat latte" becomes separate items with amounts you can tick and log. If a library food matches, it offers that instead.
+
+Keys stay on the device (local storage, never synced). Calls go straight to the provider; if the provider blocks browser requests, they are relayed through your sync server's `/api/ai` (local Node or the Netlify function), which only forwards to an allow-list of AI hosts and never stores a key.
+
+**Nutritionix** (optional, free developer keys under You → Food sources) adds a million-plus restaurant and grocery items to search and powers plain-English logging without an LLM.
 
 ### Eat out: Berkeley campus + select SF, vegetarian only
 

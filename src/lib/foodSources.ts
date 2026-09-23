@@ -13,6 +13,9 @@ export interface SourceSettings {
   usdaApiKey?: string;
   offEnabled?: boolean;
   usdaEnabled?: boolean;
+  nutritionixAppId?: string;
+  nutritionixAppKey?: string;
+  nutritionixEnabled?: boolean;
 }
 
 const OFF_BASE = "https://world.openfoodfacts.org";
@@ -271,4 +274,50 @@ export async function usdaDetail(fdcId: string, apiKey: string | undefined, sign
   if (!r.ok) return null;
   const j = (await r.json()) as UsdaFood;
   return usdaToFood(j);
+}
+
+/* ───────────────────────────── Nutritionix (optional, needs free keys) ───────────────────────────── */
+// full_nutrients uses USDA attr ids, so the USDA map applies.
+interface NixFood { food_name: string; brand_name?: string; nix_item_id?: string; serving_qty?: number; serving_unit?: string; serving_weight_grams?: number; nf_calories?: number; full_nutrients?: { attr_id: number; value: number }[]; photo?: { thumb?: string } }
+
+export function nutritionixToFood(f: NixFood, kind: "common" | "branded"): Food | null {
+  const grams = f.serving_weight_grams && f.serving_weight_grams > 0 ? f.serving_weight_grams : 100;
+  const perServing = usdaNutrients((f.full_nutrients ?? []).map((n) => ({ nutrientNumber: String(n.attr_id), value: n.value })));
+  if (perServing.kcal === undefined && f.nf_calories !== undefined) perServing.kcal = f.nf_calories;
+  if (perServing.kcal === undefined) return null;
+  const factor = 100 / grams;
+  const per100: Nutrients = {};
+  for (const [k, v] of Object.entries(perServing)) if (typeof v === "number") per100[k as NutrientKey] = v * factor;
+  const id = `nix_${kind}_${(f.nix_item_id ?? f.food_name).toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+  const label = `${f.serving_qty ?? 1} ${f.serving_unit ?? "serving"}`.trim();
+  const name = f.food_name.replace(/\b\w/g, (m) => m.toUpperCase());
+  return {
+    id, name, brand: f.brand_name || undefined, source: kind === "branded" ? "off" : "usda", sourceId: f.nix_item_id,
+    per100, servings: [{ id: `${id}_s`, label, grams }, { id: `${id}_g100`, label: "100 g", grams: 100 }], defaultServingId: `${id}_s`,
+    category: "Nutritionix", verified: false, search: lower(`${name} ${f.brand_name ?? ""}`), updatedAt: 0, useCount: 0,
+    note: `From Nutritionix (${kind})`,
+  };
+}
+
+const nixHeaders = (appId: string, appKey: string) => ({ "x-app-id": appId.trim(), "x-app-key": appKey.trim(), "Content-Type": "application/json", "x-remote-user-id": "0" });
+
+export async function nutritionixSearch(query: string, appId: string, appKey: string, signal?: AbortSignal): Promise<Food[]> {
+  const r = await fetch(`https://trackapi.nutritionix.com/v2/search/instant?query=${encodeURIComponent(query)}&detailed=true&common=true&branded=true`, { signal, headers: nixHeaders(appId, appKey) });
+  if (r.status === 401) throw new Error("Nutritionix keys rejected");
+  if (!r.ok) throw new Error(`Nutritionix ${r.status}`);
+  const j = (await r.json()) as { common?: NixFood[]; branded?: NixFood[] };
+  const out: Food[] = [];
+  for (const f of (j.common ?? []).slice(0, 8)) { const x = nutritionixToFood(f, "common"); if (x) out.push(x); }
+  for (const f of (j.branded ?? []).slice(0, 12)) { const x = nutritionixToFood(f, "branded"); if (x) out.push(x); }
+  return out;
+}
+
+/** Natural-language: "2 eggs and a slice of toast with butter" → separate foods with amounts. */
+export async function nutritionixNatural(text: string, appId: string, appKey: string): Promise<{ food: Food; grams: number; label: string }[]> {
+  const r = await fetch("https://trackapi.nutritionix.com/v2/natural/nutrients", { method: "POST", headers: nixHeaders(appId, appKey), body: JSON.stringify({ query: text }) });
+  if (r.status === 401) throw new Error("Nutritionix keys rejected");
+  if (r.status === 404) return [];
+  if (!r.ok) throw new Error(`Nutritionix ${r.status}`);
+  const j = (await r.json()) as { foods?: NixFood[] };
+  return (j.foods ?? []).map((f) => { const food = nutritionixToFood(f, "common"); return food ? { food, grams: f.serving_weight_grams ?? 100, label: `${f.serving_qty ?? 1} ${f.serving_unit ?? "serving"}` } : null; }).filter((x): x is { food: Food; grams: number; label: string } => !!x);
 }

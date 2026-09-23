@@ -14,6 +14,9 @@ import BarcodeScanner from "./BarcodeScanner";
 import CustomFoodSheet from "@/features/foods/CustomFoodSheet";
 import { subscribePack, type PackProgress } from "@/lib/usdaPack";
 import EatOut from "@/features/foods/EatOut";
+import AiFoodSheet from "./AiFoodSheet";
+import AiSheet from "@/features/you/AiSheet";
+import { Sparkles } from "lucide-react";
 import { MapPin } from "lucide-react";
 
 type Tab = "recent" | "frequent" | "favorites" | "eatout" | "mine" | "meals" | "recipes";
@@ -55,6 +58,8 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
   const [custom, setCustom] = useState<{ open: boolean; initial?: Food | null; barcode?: string }>({ open: false });
   const [meal, setMeal] = useState(mealId);
   const [multi, setMulti] = useState(false);
+  const [ai, setAi] = useState<{ open: boolean; mode: "lookup" | "describe"; query: string }>({ open: false, mode: "lookup", query: "" });
+  const [aiSettings, setAiSettings] = useState(false);
   const [pack, setPack] = useState<PackProgress>({ installing: false, done: 0, total: 0 });
   const [packTick, setPackTick] = useState(0);
   useEffect(() => subscribePack((p) => { setPack(p); if (!p.installing) setPackTick((t) => t + 1); }), []);
@@ -74,7 +79,7 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
     const query = q.trim();
     if (query.length < 2) { setLocal([]); setOnline([]); setErrors([]); setLoading(false); return; }
     let cancelled = false;
-    searchLocal(query).then((r) => { if (!cancelled) setLocal(r); });
+    const localTimer = setTimeout(() => { searchLocal(query).then((r) => { if (!cancelled) setLocal(r); }); }, 120);
     if (packTick < 0) return; // (dependency)
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -87,7 +92,7 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
       setErrors(r.errors);
       setLoading(false);
     }, 450);
-    return () => { cancelled = true; clearTimeout(t); ctrl.abort(); };
+    return () => { cancelled = true; clearTimeout(t); clearTimeout(localTimer); ctrl.abort(); };
   }, [q, packTick]);
 
   const lists = useLiveQuery(async () => ({
@@ -140,6 +145,7 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
             <Chip onClick={() => setScan(true)}><ScanBarcode size={14} /> Scan</Chip>
             <Chip onClick={() => setQuick(true)}><Zap size={14} /> Quick add</Chip>
             <Chip onClick={() => setCustom({ open: true })}><PlusCircle size={14} /> New food</Chip>
+            <Chip onClick={() => setAi({ open: true, mode: "describe", query: "" })} tone="accent"><Sparkles size={14} /> Describe</Chip>
             {!searching && <Chip active={multi} onClick={() => { setMulti((m) => !m); setPicked([]); }}><ListChecks size={14} /> Multi-add</Chip>}
             <select value={meal} onChange={(e) => setMeal(e.target.value)} className="h-8 rounded-full border border-line bg-surface px-3 text-[13px] font-medium text-ink-2">
               {meals.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -162,6 +168,12 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
               <div className="divide-y divide-line">{local.map((f) => <FoodRow key={f.id} food={f} onClick={() => setDetail(f)} />)}</div>
               {(online.length > 0 || loading) && <div className="mb-1 mt-4 flex items-center gap-1.5 eyebrow"><Globe size={12} /> Online · USDA & Open Food Facts</div>}
               <div className="divide-y divide-line">{online.map((f) => <FoodRow key={f.id} food={f} onClick={() => setDetail(f)} />)}</div>
+              {!loading && (
+                <button onClick={() => setAi({ open: true, mode: "lookup", query: q.trim() })} className="mt-3 flex w-full items-center gap-3 rounded-xl border border-dashed border-line-strong px-3 py-3 text-left">
+                  <Sparkles size={18} className="shrink-0 text-accent" />
+                  <div className="min-w-0 flex-1 text-[14px]"><span className="font-medium">Ask AI about "{q.trim()}"</span><div className="text-[12px] text-ink-3">{local.length + online.length ? "Not the right one? " : ""}The model looks it up online and returns calories, macros and a source.</div></div>
+                </button>
+              )}
               {errors.map((e) => <div key={e} className="mt-3 text-[12px] text-warn">{e}</div>)}
               {!loading && local.length === 0 && online.length === 0 && (
                 <EmptyState title="Nothing matched" body="Try a shorter name, scan the barcode, or create the food from its label." action={<Chip onClick={() => setCustom({ open: true })}><PlusCircle size={14} /> New food “{q.trim()}”</Chip>} />
@@ -210,6 +222,8 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
         onDone={() => { setDetail(null); onClose(); }} onEdit={(f) => { setDetail(null); setCustom({ open: true, initial: f }); }} />
       <QuickAddSheet open={quick} onClose={() => { setQuick(false); onClose(); }} date={date} mealId={meal} meals={meals} />
       <BarcodeScanner open={scan} onClose={() => setScan(false)} onCode={onCode} />
+      <AiFoodSheet open={ai.open} mode={ai.mode} query={ai.query} onClose={() => { setAi((a) => ({ ...a, open: false })); onClose(); }} date={date} mealId={meal} meals={meals} onOpenSettings={() => setAiSettings(true)} onPickFood={(f) => { setAi((a) => ({ ...a, open: false })); setDetail(f); }} />
+      <AiSheet open={aiSettings} onClose={() => { setAiSettings(false); }} />
       <CustomFoodSheet open={custom.open} initial={custom.initial} barcode={custom.barcode} onClose={() => setCustom({ open: false })} onSaved={(f) => { setCustom({ open: false }); setDetail(f); }} />
     </>
   );

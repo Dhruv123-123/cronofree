@@ -13,7 +13,9 @@ import { Button, Sheet, Field, Input, NumberInput, Segmented, Toggle, Confirm, u
 import GoalsSheet from "./GoalsSheet";
 import NutrientTargetsSheet from "./NutrientTargetsSheet";
 import ImportSheet from "./ImportSheet";
-import { installUsdaPack, getPackInfo, type PackInfo } from "@/lib/usdaPack";
+import AiSheet from "./AiSheet";
+import { Sparkles } from "lucide-react";
+import { installUsdaPack, getPackInfo, type PackInfo, installBrandedPack, getBrandedInfo, type BrandedInfo } from "@/lib/usdaPack";
 import { installRestaurantPack, getRestaurantInfo, type RestaurantInfo } from "@/lib/restaurantPack";
 import { mealIdFor } from "@/lib/dayModel";
 import { getTrainPrefs, setTrainPrefs, convertTrainingUnits, DEFAULT_TRAIN_PREFS, type TrainPrefs } from "@/features/train/trainRepo";
@@ -35,6 +37,7 @@ export default function YouPage() {
   const [goals, setGoals] = useState(false);
   const [nutrientTargets, setNutrientTargets] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [prof, setProf] = useState(false);
   const [prefs, setPrefs] = useState(false);
   const [sync, setSync] = useState(false);
@@ -103,6 +106,10 @@ export default function YouPage() {
           <Row label={s.state === "off" ? "Not connected" : s.state === "error" ? "Sync error" : "Connected to your server"} sub={s.state === "off" ? "Run the server on your computer and pair this device" : `${s.message ?? ""}${s.lastSyncAt ? ` · last ${formatTime(s.lastSyncAt)}` : ""}${s.pending ? ` · ${s.pending} pending` : ""}`} onClick={() => setSync(true)} right={<ChevronRight size={18} className="text-ink-3" />} />
         </Section>
 
+        <Section icon={<Sparkles size={18} />} title="AI assistant">
+          <Row label="Azure OpenAI or any OpenAI-compatible model" sub="Look up foods the library lacks, log meals in plain English" onClick={() => setAiOpen(true)} right={<ChevronRight size={18} className="text-ink-3" />} />
+        </Section>
+
         <Section icon={<Globe size={18} />} title="Food sources">
           <Row label="USDA & Open Food Facts" sub="Online search settings and API key" onClick={() => setSources(true)} right={<ChevronRight size={18} className="text-ink-3" />} />
         </Section>
@@ -124,6 +131,7 @@ export default function YouPage() {
         </Section>
       </Page>
 
+      <AiSheet open={aiOpen} onClose={() => setAiOpen(false)} />
       <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} profile={profile} />
       <NutrientTargetsSheet open={nutrientTargets} onClose={() => setNutrientTargets(false)} profile={profile} />
       <GoalsSheet open={goals} onClose={() => setGoals(false)} profile={profile} tdee={c?.currentTdee ?? 2200} trendKg={c?.trendKg ?? null} />
@@ -261,15 +269,21 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const [cfg, setCfg] = useState<SourceSettings>({ offEnabled: true, usdaEnabled: true, usdaApiKey: "" });
   const [pack, setPack] = useState<PackInfo | null>(null);
   const [rest, setRest] = useState<RestaurantInfo | null>(null);
+  const [branded, setBranded] = useState<BrandedInfo | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
-  useEffect(() => { if (open) { kvGet<SourceSettings>("foodSources", {}).then((c) => setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c })); getPackInfo().then(setPack); getRestaurantInfo().then(setRest); } }, [open]);
+  useEffect(() => { if (open) { kvGet<SourceSettings>("foodSources", {}).then((c) => setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c })); getPackInfo().then(setPack); getRestaurantInfo().then(setRest); getBrandedInfo().then(setBranded); } }, [open]);
   return (
     <Sheet open={open} onClose={onClose} title="Food sources" footer={<Button full variant="primary" onClick={async () => { await kvSet("foodSources", cfg); toast("Saved"); onClose(); }}>Save</Button>}>
       <div className="flex flex-col gap-3 text-[14px]">
         <div className="rounded-xl bg-raised px-3 py-2">
           <div className="flex items-center justify-between"><div><div>Offline USDA library</div><div className="text-[12px] text-ink-3">{pack ? `${pack.count.toLocaleString()} foods installed · ${pack.datasets.join(" + ")}` : "Not installed on this device"}</div></div>
             <Button size="sm" disabled={!!installing} onClick={async () => { setInstalling("Installing…"); const r = await installUsdaPack({ force: true, onProgress: (d, t) => setInstalling(`${Math.round((d / t) * 100)}%`) }).catch(() => null); setPack(r); setInstalling(null); toast(r ? `Offline library ready · ${r.count.toLocaleString()} foods` : "No offline pack on this server. Run npm run usda.", r ? "ok" : "warn"); }}>{installing ?? (pack ? "Reinstall" : "Install")}</Button></div>
-          <div className="mt-1 text-[12px] text-ink-3">SR Legacy + Foundation Foods with household portions, vitamins, minerals and amino acids. Built with <code className="mono">npm run usda</code>.</div>
+          <div className="mt-1 text-[12px] text-ink-3">SR Legacy + Foundation + FNDDS dishes ("burrito with beans and cheese", "pad thai with tofu") with household portions, vitamins, minerals and amino acids. Built with <code className="mono">npm run usda</code>.</div>
+        </div>
+        <div className="rounded-xl bg-raised px-3 py-2">
+          <div className="flex items-center justify-between"><div><div>Offline branded products</div><div className="text-[12px] text-ink-3">{branded ? `${branded.count.toLocaleString()} products from top US brands` : "Not installed"}</div></div>
+            <Button size="sm" disabled={!!installing} onClick={async () => { setInstalling("Installing…"); const r = await installBrandedPack({ force: true, onProgress: (d, t) => setInstalling(`${Math.round((d / t) * 100)}%`) }).catch(() => null); setBranded(r); setInstalling(null); toast(r ? `Branded products ready · ${r.count.toLocaleString()}` : "No branded pack on this server. Run npm run branded.", r ? "ok" : "warn"); }}>{installing ?? (branded ? "Reinstall" : "Install")}</Button></div>
+          <div className="mt-1 text-[12px] text-ink-3">Trader Joe's, Kirkland, Clif, Chobani, Oatly, Beyond, Amy's and 150+ more from Open Food Facts, vegetarian-filtered. Built with <code className="mono">npm run branded</code>.</div>
         </div>
         <div className="rounded-xl bg-raised px-3 py-2">
           <div className="flex items-center justify-between"><div><div>Eat out · Berkeley & SF</div><div className="text-[12px] text-ink-3">{rest ? `${rest.restaurants} restaurants · ${rest.items} vegetarian items` : "Not installed"}</div></div>
@@ -279,6 +293,11 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>USDA FoodData Central</div><div className="text-[12px] text-ink-3">Whole foods with full vitamins & minerals</div></div><Toggle checked={cfg.usdaEnabled !== false} onChange={(v) => setCfg({ ...cfg, usdaEnabled: v })} /></div>
         <Field label="USDA API key (free)" hint="The shared DEMO_KEY allows ~30 searches an hour. Get your own in seconds at api.data.gov/signup."><Input value={cfg.usdaApiKey ?? ""} onChange={(e) => setCfg({ ...cfg, usdaApiKey: e.target.value })} autoCapitalize="none" spellCheck={false} placeholder="DEMO_KEY" /></Field>
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>Open Food Facts</div><div className="text-[12px] text-ink-3">Packaged products and barcodes, community data</div></div><Toggle checked={cfg.offEnabled !== false} onChange={(v) => setCfg({ ...cfg, offEnabled: v })} /></div>
+        <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>Nutritionix (optional)</div><div className="text-[12px] text-ink-3">1M+ restaurant and grocery items plus natural-language logging. Free developer keys at developer.nutritionix.com.</div></div><Toggle checked={cfg.nutritionixEnabled !== false} onChange={(v) => setCfg({ ...cfg, nutritionixEnabled: v })} /></div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="App ID"><Input value={cfg.nutritionixAppId ?? ""} onChange={(e) => setCfg({ ...cfg, nutritionixAppId: e.target.value })} autoCapitalize="none" spellCheck={false} /></Field>
+          <Field label="App key"><Input type="password" value={cfg.nutritionixAppKey ?? ""} onChange={(e) => setCfg({ ...cfg, nutritionixAppKey: e.target.value })} autoCapitalize="none" spellCheck={false} /></Field>
+        </div>
         <p className="text-[12px] text-ink-3">Results you log are saved on this device, so they keep working offline and sync to your other devices.</p>
       </div>
     </Sheet>

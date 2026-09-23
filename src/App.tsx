@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { bootstrap } from "@/lib/bootstrap";
 import { startAutoSync } from "@/lib/sync";
-import { installUsdaPack } from "@/lib/usdaPack";
+import { installUsdaPack, installBrandedPack } from "@/lib/usdaPack";
 import { installRestaurantPack } from "@/lib/restaurantPack";
 import { useProfile, useTheme } from "@/hooks";
 import { ToastProvider, Button } from "@/components/ui";
@@ -57,7 +57,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let stop = () => {};
-    bootstrap().then(() => { setReady(true); stop = startAutoSync(); setTimeout(() => { void installRestaurantPack().catch(console.error); void installUsdaPack().catch(console.error); }, 1500); }).catch((e) => { console.error(e); setReady(true); });
+    bootstrap().then(() => { setReady(true); stop = startAutoSync(); setTimeout(() => { void installRestaurantPack().catch(console.error); installUsdaPack().catch(console.error).then(() => installBrandedPack().catch(console.error)); }, 1500); }).catch((e) => { console.error(e); setReady(true); });
     return () => stop();
   }, []);
   if (!ready) return <Loading />;

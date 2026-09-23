@@ -12,7 +12,7 @@ export function installRestaurantPack(opts: { force?: boolean } = {}): Promise<R
     try {
       const info = await getRestaurantInfo();
       const r = await fetch("/data/restaurants.json", { cache: "no-cache" }).catch(() => null);
-      if (!r || !r.ok) return info;
+      if (!r || !r.ok || !/json/i.test(r.headers.get("content-type") ?? "")) return info;
       const pack = (await r.json()) as RestaurantPack;
       const foods = restaurantFoods(pack);
       if (!opts.force && info && info.version === pack.version && info.items === foods.length) return info;

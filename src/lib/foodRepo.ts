@@ -1,7 +1,7 @@
 import { db, put, putMany, remove, kvGet } from "@/db";
 import type { Food, DiaryEntry, Recipe, SavedMeal, Serving, ISODate } from "@/db/types";
 import { scaleNutrients, sumNutrients, type Nutrients, macroKcal } from "./nutrients";
-import { offSearch, usdaSearch, offLookupBarcode, type SourceSettings } from "./foodSources";
+import { offSearch, usdaSearch, offLookupBarcode, nutritionixSearch, type SourceSettings } from "./foodSources";
 import { uid } from "./id";
 import { nowHHMM } from "./dates";
 import { scheduleSync } from "./sync";
@@ -59,6 +59,7 @@ export async function searchOnline(query: string, signal?: AbortSignal): Promise
   const tasks: Promise<Food[]>[] = [];
   if (cfg.usdaEnabled !== false) tasks.push(usdaSearch(query, cfg.usdaApiKey, signal, 20).catch((e) => { errors.push(`USDA: ${(e as Error).message}`); return []; }));
   if (cfg.offEnabled !== false) tasks.push(offSearch(query, signal, 20).catch((e) => { errors.push(`Open Food Facts: ${(e as Error).message}`); return []; }));
+  if (cfg.nutritionixEnabled !== false && cfg.nutritionixAppId && cfg.nutritionixAppKey) tasks.push(nutritionixSearch(query, cfg.nutritionixAppId, cfg.nutritionixAppKey, signal).catch((e) => { errors.push(`Nutritionix: ${(e as Error).message}`); return []; }));
   const results = await Promise.all(tasks);
   const seen = new Set<string>();
   const localIds = new Set((await db.foods.where("id").anyOf(results.flat().map((f) => f.id)).toArray()).map((f) => f.id));
@@ -166,6 +167,14 @@ export async function logQuick(a: { date: ISODate; mealId: string; name: string;
   return entry;
 }
 
+/** Log an item that has no library food behind it (AI or natural-language results). */
+export async function logAdHoc(a: { date: ISODate; mealId: string; name: string; brand?: string; grams: number; servingLabel?: string; nutrients: Nutrients; note?: string }): Promise<DiaryEntry> {
+  const entry: DiaryEntry = { id: uid("e"), date: a.date, mealId: a.mealId, kind: "food", name: a.name, brand: a.brand, grams: a.grams, servingLabel: a.servingLabel, servingQty: a.servingLabel ? 1 : undefined, nutrients: a.nutrients, note: a.note, time: nowHHMM(), order: Date.now(), updatedAt: 0 };
+  await put("entries", entry);
+  scheduleSync();
+  return entry;
+}
+
 export async function updateEntry(e: DiaryEntry, patch: Partial<DiaryEntry>): Promise<void> {
   const next = { ...e, ...patch };
   if (next.kind === "food" && next.foodId && (patch.grams !== undefined)) {
@@ -209,6 +218,8 @@ export interface CustomFoodInput {
   perServing: Nutrients;
   extraServings?: { label: string; grams: number }[];
   isLiquid?: boolean;
+  note?: string;
+  basis?: "published" | "estimated";
 }
 
 export async function saveCustomFood(input: CustomFoodInput): Promise<Food> {
@@ -233,6 +244,8 @@ export async function saveCustomFood(input: CustomFoodInput): Promise<Food> {
     servings,
     defaultServingId: servings[0].id,
     isLiquid: !!input.isLiquid,
+    note: input.note ?? existing?.note,
+    basis: input.basis ?? existing?.basis,
     search: `${input.name} ${input.brand ?? ""}`.toLowerCase(),
     deletedAt: null,
   };

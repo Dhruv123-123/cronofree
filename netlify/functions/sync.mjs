@@ -9,7 +9,8 @@
 import { getStore } from "@netlify/blobs";
 import { applySync, emptyStore, rowCount, tokenMatches } from "../../server/syncCore.mjs";
 
-export const config = { path: ["/api/health", "/api/sync", "/api/fetch"] };
+const AI_HOSTS = [/\.openai\.azure\.com$/, /\.cognitiveservices\.azure\.com$/, /\.services\.ai\.azure\.com$/, /^api\.openai\.com$/, /^trackapi\.nutritionix\.com$/, /^openrouter\.ai$/, /^api\.groq\.com$/, /^generativelanguage\.googleapis\.com$/, /^api\.anthropic\.com$/];
+export const config = { path: ["/api/health", "/api/sync", "/api/fetch", "/api/ai"] };
 
 const json = (body, status = 200, extra = {}) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...extra } });
 
@@ -39,6 +40,19 @@ export default async (req) => {
     const { result, changed } = applySync(store, since, changes);
     if (changed) await blobs.setJSON("store", store);
     return json(result, 200, cors);
+  }
+
+  if (url.pathname === "/api/ai" && req.method === "POST") {
+    const { url: target, method = "POST", headers = {}, body = "" } = await req.json().catch(() => ({}));
+    let host = "";
+    try { host = new URL(String(target)).hostname; } catch { return json({ error: "bad url" }, 400, cors); }
+    if (!AI_HOSTS.some((re) => re.test(host))) return json({ error: `host not allowed: ${host}` }, 400, cors);
+    try {
+      const r = await fetch(String(target), { method, headers: { ...headers }, body: method === "GET" ? undefined : body });
+      return json({ status: r.status, text: await r.text() }, 200, cors);
+    } catch (e) {
+      return json({ error: String(e?.message || e) }, 502, cors);
+    }
   }
 
   if (url.pathname === "/api/fetch") {

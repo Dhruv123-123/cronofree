@@ -90,6 +90,24 @@ app.post("/api/sync", auth, (req, res) => {
   res.json(result);
 });
 
+const AI_HOSTS = [/\.openai\.azure\.com$/, /\.cognitiveservices\.azure\.com$/, /\.services\.ai\.azure\.com$/, /^api\.openai\.com$/, /^trackapi\.nutritionix\.com$/, /^openrouter\.ai$/, /^api\.groq\.com$/, /^generativelanguage\.googleapis\.com$/, /^api\.anthropic\.com$/];
+// Relay for AI providers / Nutritionix when the browser can't call them directly (CORS). Forwards only; keys come from the client.
+app.post("/api/ai", auth, async (req, res) => {
+  const { url, method = "POST", headers = {}, body = "" } = req.body || {};
+  let host = "";
+  try { host = new URL(String(url)).hostname; } catch { return res.status(400).json({ error: "bad url" }); }
+  if (!AI_HOSTS.some((re) => re.test(host))) return res.status(400).json({ error: `host not allowed: ${host}` });
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 90000);
+    const r = await fetch(String(url), { method, headers: { ...headers }, body: method === "GET" ? undefined : body, signal: ctrl.signal });
+    clearTimeout(t);
+    res.json({ status: r.status, text: await r.text() });
+  } catch (e) {
+    res.status(502).json({ error: String(e.message || e) });
+  }
+});
+
 // Fetch proxy for recipe import (browsers block cross-origin page fetches). Token-protected, small, short.
 app.get("/api/fetch", auth, async (req, res) => {
   const url = String(req.query.url || "");
@@ -107,8 +125,8 @@ app.get("/api/fetch", auth, async (req, res) => {
 });
 
 // Pre-compressed offline food pack (6+ MB raw, ~1 MB gzipped)
-app.get("/data/usda-pack.json", (req, res, next) => {
-  const gz = path.join(DIST, "data", "usda-pack.json.gz");
+app.get(["/data/usda-pack.json", "/data/branded-pack.json"], (req, res, next) => {
+  const gz = path.join(DIST, "data", path.basename(req.path) + ".gz");
   if (!fs.existsSync(gz) || !/\bgzip\b/.test(req.headers["accept-encoding"] || "")) return next();
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Content-Encoding", "gzip");
