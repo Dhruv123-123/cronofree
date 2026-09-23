@@ -9,6 +9,8 @@
 import { kvGet, kvSet } from "@/db";
 import { getSyncConfig } from "./sync";
 import type { Nutrients } from "./nutrients";
+import { baseUrl, extractJson } from "./aiPure";
+export { baseUrl, extractJson };
 
 export interface AiConfig {
   provider: "azure" | "openai";
@@ -52,17 +54,7 @@ function authHeaders(c: AiConfig): Record<string, string> {
   return { Authorization: `Bearer ${c.apiKey}` };
 }
 
-function baseUrl(c: AiConfig): string {
-  const e = c.endpoint.trim().replace(/\/+$/, "");
-  return c.provider === "openai" ? (e || "https://api.openai.com") : e;
-}
-
-export function extractJson(text: string): unknown {
-  try { return JSON.parse(text); } catch { /* fall through */ }
-  const m = text.match(/\{[\s\S]*\}/);
-  if (m) { try { return JSON.parse(m[0]); } catch { /* fall through */ } }
-  throw new Error("The model did not return JSON.");
-}
+const isReasoningModel = (m: string) => /^(gpt-5|o\d)/i.test(m.trim()) || /gpt-5/i.test(m);
 
 interface Msg { role: "system" | "user"; content: string }
 
@@ -83,6 +75,7 @@ export async function askJson(messages: Msg[], opts: { config?: AiConfig } = {})
       if (toolType === "web_search") tool.user_location = { type: "approximate", country: "US", city: "Berkeley", region: "California", timezone: "America/Los_Angeles" };
       const body: Record<string, unknown> = { model: c.model, input, tools: [tool], tool_choice: "auto" };
       if (toolType === "web_search") body.include = ["web_search_call.action.sources"];
+      if (isReasoningModel(c.model)) body.reasoning = { effort: "low" }; // quick lookups: fewer Bing requests, faster
       try {
         const r = await relayFetch(url, { headers: { "Content-Type": "application/json", ...authHeaders(c) }, body: JSON.stringify(body) }, c.transport);
         if (r.status === 401 || r.status === 403) throw new Error(`Provider rejected the key (${r.status}).`);
