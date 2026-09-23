@@ -175,6 +175,8 @@ export interface Profile extends Base {
   mealSplit?: Record<string, number>;
   netCarbsTarget?: number;
   mealNames: string[];
+  /** Ranks meat/fish results lower (never hides them) */
+  diet?: "none" | "vegetarian" | "vegan";
   units: { weight: "kg" | "lb"; height: "cm" | "in"; volume: "ml" | "oz" };
   startOfWeek: 0 | 1;
   waterGoalMl: number;

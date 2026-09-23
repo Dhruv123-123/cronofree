@@ -13,6 +13,7 @@ import QuickAddSheet from "./QuickAddSheet";
 import BarcodeScanner from "./BarcodeScanner";
 import CustomFoodSheet from "@/features/foods/CustomFoodSheet";
 import { subscribePack, type PackProgress } from "@/lib/usdaPack";
+import { useProfile } from "@/hooks";
 import EatOut from "@/features/foods/EatOut";
 import AiFoodSheet from "./AiFoodSheet";
 import AiSheet from "@/features/you/AiSheet";
@@ -46,6 +47,7 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
   open: boolean; onClose: () => void; date: ISODate; mealId: string; meals: { id: string; name: string }[]; nutrientTargets: Nutrients; macroTargets: { kcal: number; protein: number; carbs: number; fat: number };
 }) {
   const toast = useToast();
+  const profile = useProfile();
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<Tab>("recent");
   const [local, setLocal] = useState<Food[]>([]);
@@ -79,7 +81,7 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
     const query = q.trim();
     if (query.length < 2) { setLocal([]); setOnline([]); setErrors([]); setLoading(false); return; }
     let cancelled = false;
-    const localTimer = setTimeout(() => { searchLocal(query).then((r) => { if (!cancelled) setLocal(r); }); }, 120);
+    const localTimer = setTimeout(() => { searchLocal(query, 40, { diet: profile.diet }).then((r) => { if (!cancelled) setLocal(r); }); }, 120);
     if (packTick < 0) return; // (dependency)
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -93,7 +95,7 @@ export default function AddFoodSheet({ open, onClose, date, mealId, meals, nutri
       setLoading(false);
     }, 450);
     return () => { cancelled = true; clearTimeout(t); clearTimeout(localTimer); ctrl.abort(); };
-  }, [q, packTick]);
+  }, [q, packTick, profile.diet]);
 
   const lists = useLiveQuery(async () => ({
     recent: await recentFoods(40),

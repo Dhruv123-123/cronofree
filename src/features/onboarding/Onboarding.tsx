@@ -24,6 +24,7 @@ export default function Onboarding() {
   const [goal, setGoal] = useState<GoalType>("maintain");
   const [rate, setRate] = useState<number | "">(0.5);
   const [theme, setTheme] = useState<"system" | "dark" | "light">("system");
+  const [diet, setDiet] = useState<"none" | "vegetarian" | "vegan">("vegetarian");
   const [pair, setPair] = useState(false);
   const [pairUrl, setPairUrl] = useState("");
   const [pairToken, setPairToken] = useState("");
@@ -57,7 +58,7 @@ export default function Onboarding() {
     const base = defaultProfile();
     await updateProfile({
       ...base, name: name.trim() || undefined, sex, birthYear: Number(birthYear) || 1990, heightCm: cm, activity, goal, rateKgPerWeek: signedRate,
-      units: { weight: wu, height: hu, volume: units === "metric" ? "ml" : "oz" }, targets: macros, expenditure: tdee, expenditureUpdatedAt: Date.now(), theme, onboarded: true,
+      units: { weight: wu, height: hu, volume: units === "metric" ? "ml" : "oz" }, targets: macros, expenditure: tdee, expenditureUpdatedAt: Date.now(), theme, diet, onboarded: true,
     });
     await put("weights", { id: uid("w"), date: today(), at: Date.now(), kg, updatedAt: 0 });
   }
@@ -79,6 +80,7 @@ export default function Onboarding() {
         <Field label={`Height`}><NumberInput value={height} onChange={setHeight} suffix={hu} /></Field>
         <Field label="Weight"><NumberInput value={weight} onChange={setWeight} suffix={wu} step={0.1} /></Field>
       </div>
+      <Field label="Diet" hint="Search ranks meat and fish lower; the Eat out list is vegetarian only."><Segmented value={diet} onChange={setDiet} options={[{ value: "none", label: "Everything" }, { value: "vegetarian", label: "Vegetarian" }, { value: "vegan", label: "Vegan" }]} className="w-full" /></Field>
       <Field label="Activity outside training"><select value={activity} onChange={(e) => setActivity(e.target.value as ActivityLevel)} className="field">{Object.entries(ACTIVITY_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
     </div>,
     <div key="2" className="flex flex-col gap-4">

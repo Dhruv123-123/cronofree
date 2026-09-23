@@ -17,9 +17,18 @@ function tokens(q: string): string[] {
   return q.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
 }
 
-function scoreLocal(f: Food, toks: string[], q: string): number {
+const MEAT_RE = /\b(chicken|beef|pork|bacon|ham|turkey|steak|carnitas|barbacoa|shrimp|prawn|fish|salmon|tuna|cod|crab|lobster|anchov|pepperoni|sausage|chorizo|lamb|duck|veal|gelatin|prosciutto|salami|meatball|pastrami|brisket|ribs?)\b/;
+const DAIRY_EGG_RE = /\b(cheese|milk|butter|cream|yogurt|egg|whey|casein|ghee|paneer|honey)\b/;
+export interface SearchOpts { diet?: "none" | "vegetarian" | "vegan" }
+
+function scoreLocal(f: Food, toks: string[], q: string, opts: SearchOpts = {}): number {
   const s = f.search;
   let score = 0;
+  if (opts.diet && opts.diet !== "none" && f.source !== "restaurant") {
+    const name = f.name.toLowerCase();
+    if (MEAT_RE.test(name) && !/\b(vegan|veggie|vegetarian|meatless|plant|tofu|impossible|beyond|mock)\b/.test(name)) score -= 35;
+    else if (opts.diet === "vegan" && DAIRY_EGG_RE.test(name) && !/\b(vegan|plant|oat|almond|soy|coconut)\b/.test(name)) score -= 15;
+  }
   if (s.startsWith(q)) score += 50;
   const name = f.name.toLowerCase();
   if (name === q) score += 100;
@@ -36,14 +45,14 @@ function scoreLocal(f: Food, toks: string[], q: string): number {
   return score;
 }
 
-export async function searchLocal(query: string, limit = 40): Promise<Food[]> {
+export async function searchLocal(query: string, limit = 40, opts: SearchOpts = {}): Promise<Food[]> {
   const q = query.trim().toLowerCase();
   const toks = tokens(q);
   if (!toks.length) return [];
   const all = await db.foods.filter((f) => !f.deletedAt && toks.every((t) => f.search.includes(t))).toArray();
   return all
-    .map((f) => ({ f, s: scoreLocal(f, toks, q) }))
-    .filter((x) => x.s >= 0)
+    .map((f) => ({ f, s: scoreLocal(f, toks, q, opts) }))
+    .filter((x) => x.s >= -30 || toks.some((t) => MEAT_RE.test(t)))
     .sort((a, b) => b.s - a.s)
     .slice(0, limit)
     .map((x) => x.f);

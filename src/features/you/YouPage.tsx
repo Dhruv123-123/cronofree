@@ -179,12 +179,13 @@ function PrefsSheet({ open, onClose, profile }: { open: boolean; onClose: () => 
     if (p.units.weight !== profile.units.weight) await convertTrainingUnits(profile.units.weight, p.units.weight);
     const mealSplit: Record<string, number> = {};
     for (const [k, v] of Object.entries(split)) if (v !== "" && Number(v) > 0) mealSplit[k] = Number(v);
-    await updateProfile({ units: p.units, mealNames: names.length ? names : profile.mealNames, waterGoalMl: p.waterGoalMl, fastingDefaultHours: p.fastingDefaultHours, theme: p.theme, startOfWeek: p.startOfWeek, mealSplit: Object.keys(mealSplit).length ? mealSplit : undefined });
+    await updateProfile({ units: p.units, mealNames: names.length ? names : profile.mealNames, waterGoalMl: p.waterGoalMl, fastingDefaultHours: p.fastingDefaultHours, theme: p.theme, startOfWeek: p.startOfWeek, mealSplit: Object.keys(mealSplit).length ? mealSplit : undefined, diet: p.diet ?? "none" });
     toast("Preferences saved"); onClose();
   }
   return (
     <Sheet open={open} onClose={onClose} title="Preferences" footer={<Button full variant="primary" onClick={save}>Save</Button>}>
       <div className="flex flex-col gap-4">
+        <Field label="Diet" hint="Ranks meat and fish lower in search results. Nothing is hidden."><Segmented value={p.diet ?? "none"} onChange={(v) => setP({ ...p, diet: v })} options={[{ value: "none", label: "Everything" }, { value: "vegetarian", label: "Vegetarian" }, { value: "vegan", label: "Vegan" }]} className="w-full" /></Field>
         <Field label="Theme"><Segmented value={p.theme} onChange={(v) => setP({ ...p, theme: v })} options={[{ value: "system", label: "System" }, { value: "dark", label: "Dark" }, { value: "light", label: "Light" }]} className="w-full" /></Field>
         <Field label="Body weight & lifting weights" hint="Changing this converts your logged workouts."><Segmented value={p.units.weight} onChange={(v) => setP({ ...p, units: { ...p.units, weight: v } })} options={[{ value: "kg", label: "Kilograms" }, { value: "lb", label: "Pounds" }]} className="w-full" /></Field>
         <div className="grid grid-cols-2 gap-2">
