@@ -56,7 +56,7 @@ You → **AI assistant**: paste an Azure OpenAI endpoint + deployment + key (or 
 - **Ask AI** appears under every search. The model looks the item up with the Responses API `web_search` tool (on Azure this is Bing-grounded and works with GPT-4-class models and later; on OpenAI the same tool, or `gpt-4o-mini-search-preview`), and returns per-serving calories and macros with a citation and a confidence label. "Save & add" keeps it in My foods. Azure bills web search per Bing request on top of tokens; a subscription admin can block the tool, in which case the app falls back to plain chat and says so in Test.
 - **Describe a meal**: "two eggs with cheddar, sourdough toast with butter, 16 oz oat latte" becomes separate items with amounts you can tick and log. If a library food matches, it offers that instead.
 
-Keys stay on the device (local storage, never synced). Calls go straight to the provider; if the provider blocks browser requests, they are relayed through your sync server's `/api/ai` (local Node or the Netlify function), which only forwards to an allow-list of AI hosts and never stores a key.
+Keys stay on the device (local storage, never synced). Calls go straight to the provider; if the provider blocks browser requests, they are relayed through your sync server's `/api/ai` (local Node, the Vercel function or the Netlify function), which only forwards to an allow-list of AI hosts and never stores a key.
 
 **Nutritionix** (optional, free developer keys under You → Food sources) adds a million-plus restaurant and grocery items to search and powers plain-English logging without an LLM.
 
@@ -77,6 +77,15 @@ The app installs the pack on launch and refreshes it whenever the file changes.
 - **On each device:** IndexedDB (via Dexie). Photos are compressed JPEGs stored inline.
 - **On your computer:** `server/data/store.json`, one JSON document, written atomically. Back it up like any file.
 - **Backups:** You → Your data → *Download backup* gives you a full JSON snapshot; *Restore* merges it back (newer records win). *Export diary (CSV)* for spreadsheets.
+
+### Free hosting on Vercel (with sync, no computer needed)
+
+1. In Vercel: *Add New → Project → Import* the GitHub repo. The build settings come from `vercel.json`; nothing to type. Deploy.
+2. **Storage → Create Database → Blob**, and connect it to the project. This adds `BLOB_READ_WRITE_TOKEN` to the project automatically.
+3. **Settings → Environment Variables → `CRONOFREE_TOKEN`** = any long random string (for example `openssl rand -hex 24`). Redeploy so both variables take effect.
+4. Open your `*.vercel.app` URL on your phone, add it to the Home Screen, and paste the token into **You → Sync** on every device. Leave the server URL blank.
+
+Sync, the AI relay and the recipe importer run as one Vercel Function (`api/[...route].mjs`) storing a single private blob in your own Vercel account. Until step 2 and 3 are done the app still works fully offline; **You → Sync → Test** tells you which step is missing.
 
 ### Free hosting on Netlify (with sync, no computer needed)
 

@@ -70,7 +70,11 @@ export async function testConnection(cfg: Pick<SyncConfig, "url" | "token">): Pr
   try {
     const r = await fetch(apiUrl(cfg as SyncConfig, "/api/health"), { headers: { Authorization: `Bearer ${cfg.token}` } });
     if (r.status === 401) return { ok: false, message: "Server reached, but the token is wrong." };
-    if (!r.ok) return { ok: false, message: `Server answered ${r.status}.` };
+    if (!r.ok) {
+      const hint = await r.json().then((j: { error?: string }) => j?.error).catch(() => undefined);
+      if (r.status === 404) return { ok: false, message: "No API at this address. On Vercel or Netlify, make sure the latest commit is deployed; otherwise check the server URL." };
+      return { ok: false, message: hint ? `Server not set up yet: ${hint}` : `Server answered ${r.status}.` };
+    }
     const j = (await r.json()) as { ok?: boolean; name?: string; rows?: number };
     return { ok: !!j.ok, message: j.ok ? `Connected to ${j.name ?? "server"} · ${j.rows ?? 0} rows stored` : "Unexpected reply." };
   } catch (e) {
