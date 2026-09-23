@@ -54,7 +54,8 @@ export default function AiFoodSheet({ open, onClose, mode: initialMode, query, d
         const r = await aiParseMeal(text.trim());
         parsed = r.items; setMeta(`${r.model}${r.usedWebSearch ? " · web search" : ""}`);
       }
-      const withMatches = await Promise.all(parsed.map(async (it) => { const m = await searchLocal(it.name, 1); return { ...it, selected: true, localMatch: m[0] }; }));
+      // only suggest a library food when it's a tight match (avoid "Sourdough bread" → "Tomato soup in sourdough bread bowl")
+      const withMatches = await Promise.all(parsed.map(async (it) => { const m = (await searchLocal(it.name, 3)).find((f) => f.name.split(/[\s,]+/).length <= it.name.split(/\s+/).length + 2); return { ...it, selected: true, localMatch: m }; }));
       setItems(withMatches);
       if (!parsed.length) setError("Nothing recognisable in that description.");
     } catch (e) { setError((e as Error).message); }
