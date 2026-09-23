@@ -8,7 +8,8 @@ export default function AiSheet({ open, onClose }: { open: boolean; onClose: () 
   const [c, setC] = useState<AiConfig>(DEFAULT_AI);
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
-  useEffect(() => { if (open) { getAiConfig().then(setC); setResult(null); } }, [open]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { if (open) { setLoaded(false); getAiConfig().then((cfg) => { setC(cfg); setLoaded(true); }); setResult(null); } }, [open]);
   const set = (p: Partial<AiConfig>) => setC((x) => ({ ...x, ...p }));
 
   return (
@@ -27,7 +28,7 @@ export default function AiSheet({ open, onClose }: { open: boolean; onClose: () 
           </ul>
           <p className="mt-2">Your key is stored only on this device. Calls go straight to your provider; if it blocks browser requests, they're relayed through your sync server, which only forwards them.</p>
         </div>
-        <Field label="Provider"><Segmented value={c.provider} onChange={(v) => set({ provider: v, endpoint: v === "openai" ? "" : c.endpoint, apiVersion: c.apiVersion })} options={[{ value: "azure", label: "Azure OpenAI" }, { value: "openai", label: "OpenAI / compatible" }]} className="w-full" /></Field>
+        {loaded && <><Field label="Provider"><Segmented value={c.provider} onChange={(v) => set({ provider: v, endpoint: v === "openai" ? "" : c.endpoint, apiVersion: c.apiVersion })} options={[{ value: "azure", label: "Azure OpenAI" }, { value: "openai", label: "OpenAI / compatible" }]} className="w-full" /></Field>
         {c.provider === "azure" ? (
           <>
             <Field label="Endpoint" hint="From Azure AI Foundry → your resource → Keys and Endpoint."><Input placeholder="https://my-resource.openai.azure.com" value={c.endpoint} onChange={(e) => set({ endpoint: e.target.value })} inputMode="url" autoCapitalize="none" /></Field>
@@ -46,7 +47,7 @@ export default function AiSheet({ open, onClose }: { open: boolean; onClose: () 
           </>
         )}
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>Use web search</div><div className="text-[12px] text-ink-3">Responses API <code className="mono">web_search</code> tool (on Azure: Bing-grounded, GPT-4-class models and later, billed per Bing request). Falls back to plain chat if the tool is blocked.</div></div><Toggle checked={c.webSearch} onChange={(v) => set({ webSearch: v })} /></div>
-        <Field label="Transport"><Segmented value={c.transport} onChange={(v) => set({ transport: v })} options={[{ value: "auto", label: "Auto" }, { value: "direct", label: "Direct" }, { value: "proxy", label: "Via sync server" }]} className="w-full" /></Field>
+        <Field label="Transport"><Segmented value={c.transport} onChange={(v) => set({ transport: v })} options={[{ value: "auto", label: "Auto" }, { value: "direct", label: "Direct" }, { value: "proxy", label: "Via sync server" }]} className="w-full" /></Field></>}
         {result && <div className={`flex items-start gap-2 text-[13px] ${result.ok ? "text-good" : "text-bad"}`}>{result.ok && <Check size={14} className="mt-0.5 shrink-0" />}<span>{result.msg}</span></div>}
       </div>
     </Sheet>

@@ -234,7 +234,8 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [auto, setAuto] = useState(true);
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (open) getSyncConfig().then((c) => { setUrl(c.url); setToken(c.token); setAuto(c.autoSync); setTest(null); }); }, [open]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { if (open) { setLoaded(false); getSyncConfig().then((c) => { setUrl(c.url); setToken(c.token); setAuto(c.autoSync); setTest(null); setLoaded(true); }); } }, [open]);
   const sameOrigin = location.pathname && !/^https?:\/\/localhost:5173/.test(location.origin);
   async function save() {
     await setSyncConfig({ url: url.trim(), token: token.trim(), autoSync: auto });
@@ -254,9 +255,9 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           </ol>
           <p className="mt-2">Everything stays local-first: you can log offline and it merges when you're back on the network. Newer edits win.</p>
         </div>
-        <Field label="Server URL" hint={sameOrigin ? "Leave blank to use the address this app was opened from." : "e.g. http://192.168.1.20:8787 or your Tailscale / tunnel address"}><Input placeholder={location.origin} value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" autoCapitalize="none" /></Field>
+        {loaded && <><Field label="Server URL" hint={sameOrigin ? "Leave blank to use the address this app was opened from." : "e.g. http://192.168.1.20:8787 or your Tailscale / tunnel address"}><Input placeholder={location.origin} value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" autoCapitalize="none" /></Field>
         <Field label="Pairing token"><Input value={token} onChange={(e) => setToken(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="printed by the server" /></Field>
-        <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><span>Sync automatically</span><Toggle checked={auto} onChange={setAuto} /></div>
+        <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><span>Sync automatically</span><Toggle checked={auto} onChange={setAuto} /></div></>}
         {test && <div className={`flex items-center gap-2 text-[13px] ${test.ok ? "text-good" : "text-bad"}`}>{test.ok && <Check size={14} />}{test.message}</div>}
         {s.state !== "off" && <div className="text-[12px] text-ink-3">Status: {s.message ?? s.state}{s.lastSyncAt ? ` · last sync ${formatTime(s.lastSyncAt)}` : ""}{s.pending ? ` · ${s.pending} changes waiting` : ""}</div>}
         {s.state !== "off" && <Button onClick={() => syncNow()} disabled={s.state === "syncing"}>Sync now</Button>}
@@ -272,7 +273,8 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const [rest, setRest] = useState<RestaurantInfo | null>(null);
   const [branded, setBranded] = useState<BrandedInfo | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
-  useEffect(() => { if (open) { kvGet<SourceSettings>("foodSources", {}).then((c) => setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c })); getPackInfo().then(setPack); getRestaurantInfo().then(setRest); getBrandedInfo().then(setBranded); } }, [open]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => { if (open) { setLoaded(false); kvGet<SourceSettings>("foodSources", {}).then((c) => { setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c }); setLoaded(true); }); getPackInfo().then(setPack); getRestaurantInfo().then(setRest); getBrandedInfo().then(setBranded); } }, [open]);
   return (
     <Sheet open={open} onClose={onClose} title="Food sources" footer={<Button full variant="primary" onClick={async () => { await kvSet("foodSources", cfg); toast("Saved"); onClose(); }}>Save</Button>}>
       <div className="flex flex-col gap-3 text-[14px]">
@@ -291,7 +293,7 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
             <Button size="sm" onClick={async () => { const r = await installRestaurantPack({ force: true }).catch(() => null); setRest(r); toast(r ? `Restaurants ready · ${r.items} items` : "No restaurant pack on this server.", r ? "ok" : "warn"); }}>{rest ? "Reinstall" : "Install"}</Button></div>
           <div className="mt-1 text-[12px] text-ink-3">Edit <code className="mono">data/restaurants/*.json</code> and run <code className="mono">npm run restaurants</code> to add places.</div>
         </div>
-        <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>USDA FoodData Central</div><div className="text-[12px] text-ink-3">Whole foods with full vitamins & minerals</div></div><Toggle checked={cfg.usdaEnabled !== false} onChange={(v) => setCfg({ ...cfg, usdaEnabled: v })} /></div>
+        {loaded && <><div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>USDA FoodData Central</div><div className="text-[12px] text-ink-3">Whole foods with full vitamins & minerals</div></div><Toggle checked={cfg.usdaEnabled !== false} onChange={(v) => setCfg({ ...cfg, usdaEnabled: v })} /></div>
         <Field label="USDA API key (free)" hint="The shared DEMO_KEY allows ~30 searches an hour. Get your own in seconds at api.data.gov/signup."><Input value={cfg.usdaApiKey ?? ""} onChange={(e) => setCfg({ ...cfg, usdaApiKey: e.target.value })} autoCapitalize="none" spellCheck={false} placeholder="DEMO_KEY" /></Field>
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>Open Food Facts</div><div className="text-[12px] text-ink-3">Packaged products and barcodes, community data</div></div><Toggle checked={cfg.offEnabled !== false} onChange={(v) => setCfg({ ...cfg, offEnabled: v })} /></div>
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>Nutritionix (optional)</div><div className="text-[12px] text-ink-3">1M+ restaurant and grocery items plus natural-language logging. Free developer keys at developer.nutritionix.com.</div></div><Toggle checked={cfg.nutritionixEnabled !== false} onChange={(v) => setCfg({ ...cfg, nutritionixEnabled: v })} /></div>
@@ -299,7 +301,7 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <Field label="App ID"><Input value={cfg.nutritionixAppId ?? ""} onChange={(e) => setCfg({ ...cfg, nutritionixAppId: e.target.value })} autoCapitalize="none" spellCheck={false} /></Field>
           <Field label="App key"><Input type="password" value={cfg.nutritionixAppKey ?? ""} onChange={(e) => setCfg({ ...cfg, nutritionixAppKey: e.target.value })} autoCapitalize="none" spellCheck={false} /></Field>
         </div>
-        <p className="text-[12px] text-ink-3">Results you log are saved on this device, so they keep working offline and sync to your other devices.</p>
+        <p className="text-[12px] text-ink-3">Results you log are saved on this device, so they keep working offline and sync to your other devices.</p></>}
       </div>
     </Sheet>
   );
