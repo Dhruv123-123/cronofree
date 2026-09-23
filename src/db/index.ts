@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import { indexUpsert } from "@/lib/searchIndex";
 import type {
   Food, Recipe, DiaryEntry, SavedMeal, WaterLog, Fast, WeightEntry, Measurement, Photo, Profile,
   DayTargetOverride, Exercise, Program, Workout, Outbox, KV, Collection, Base, Biometric,
@@ -68,6 +69,7 @@ export async function put<T extends Base>(c: Collection, row: T, opts: { silent?
     await table<T>(c).put(stamped);
     if (!opts.silent) await db.outbox.put({ key: `${c}:${row.id}`, collection: c, id: row.id, at: stamped.updatedAt });
   });
+  if (c === "foods") indexUpsert([stamped as unknown as Food]);
   return stamped;
 }
 
@@ -78,6 +80,7 @@ export async function putMany<T extends Base>(c: Collection, rows: T[], opts: { 
     await table<T>(c).bulkPut(stamped);
     if (!opts.silent) await db.outbox.bulkPut(stamped.map((r) => ({ key: `${c}:${r.id}`, collection: c, id: r.id, at: now })));
   });
+  if (c === "foods") indexUpsert(stamped as unknown as Food[]);
 }
 
 /** Soft delete (tombstone) so the deletion syncs to other devices. */

@@ -3,7 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Plus, ChefHat, Search, Star, UtensilsCrossed, Trash2, Pencil } from "lucide-react";
 import { db } from "@/db";
 import type { Food, Recipe, SavedMeal } from "@/db/types";
-import { useProfile } from "@/hooks";
+import { useProfile, useIndexRows, useFoodsByIds } from "@/hooks";
 import { mealsOf, suggestedMealId, nutrientTargetsFor } from "@/lib/dayModel";
 import { today } from "@/lib/dates";
 import { fmt } from "@/lib/units";
@@ -34,29 +34,36 @@ export default function FoodsPage() {
   const [mealView, setMealView] = useState<SavedMeal | null>(null);
   const [urlImport, setUrlImport] = useState(false);
 
-  const foods = useLiveQuery(() => db.foods.filter((f) => !f.deletedAt).toArray(), []);
+  const index = useIndexRows();
   const recipesLive = useLiveQuery(() => db.recipes.filter((r) => !r.deletedAt).toArray(), []);
   const meals = useLiveQuery(() => db.savedMeals.filter((m) => !m.deletedAt).toArray(), []);
   const searched = useLiveQuery(() => (q.trim().length >= 2 ? searchLocal(q, 100) : Promise.resolve([] as Food[])), [q]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    for (const f of foods ?? []) if (f.category && (f.source === "seed" || f.source === "usda")) set.add(f.category);
+    for (const f of index ?? []) if (f.category && (f.source === "seed" || f.source === "usda")) set.add(f.category);
     return [...set].sort();
-  }, [foods]);
+  }, [index]);
 
-  const browse = useMemo(() => {
-    if (q.trim().length >= 2) return searched ?? [];
-    let list = (foods ?? []).filter((f) => f.source !== "recipe");
+  const browseIds = useMemo(() => {
+    if (q.trim().length >= 2) return null;
+    let list = (index ?? []).filter((f) => f.source !== "recipe");
     if (cat === "favorites") list = list.filter((f) => f.favorite);
     else if (cat === "recent") list = list.filter((f) => f.lastUsedAt).sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0));
     else if (cat !== "all") list = list.filter((f) => f.category === cat);
     if (cat !== "recent") list = list.slice().sort((a, b) => a.name.localeCompare(b.name));
-    return list;
-  }, [foods, searched, q, cat]);
+    return list.map((f) => f.id);
+  }, [index, q, cat]);
+  const browseTotal = browseIds?.length ?? (searched?.length ?? 0);
+  const browseFoods = useFoodsByIds(browseIds ? browseIds.slice(0, 200) : []);
+  const browse = browseIds ? browseFoods : (searched ?? []);
 
-  const mine = useMemo(() => (foods ?? []).filter((f) => f.source === "custom").sort((a, b) => a.name.localeCompare(b.name)), [foods]);
-  const recipeFoods = useMemo(() => new Map((foods ?? []).filter((f) => f.source === "recipe").map((f) => [f.id, f])), [foods]);
+  const mineIds = useMemo(() => (index ?? []).filter((f) => f.source === "custom").sort((a, b) => a.name.localeCompare(b.name)).map((f) => f.id), [index]);
+  const mine = useFoodsByIds(mineIds);
+  const recipeIds = useMemo(() => (index ?? []).filter((f) => f.source === "recipe").map((f) => f.id), [index]);
+  const recipeFoodList = useFoodsByIds(recipeIds);
+  const recipeFoods = useMemo(() => new Map(recipeFoodList.map((f) => [f.id, f])), [recipeFoodList]);
+  const foods = index;
   const dayMeals = mealsOf(profile);
   const nutrientTargets = nutrientTargetsFor(profile, profile.targets.kcal);
 
@@ -89,8 +96,8 @@ export default function FoodsPage() {
             )}
             <div className="card divide-y divide-line px-4">
               {browse.slice(0, 200).map((f) => <FoodRow key={f.id} food={f} onClick={() => setDetail(f)} />)}
-              {browse.length === 0 && <EmptyState title="No foods here" body="Anything you log from USDA or Open Food Facts is saved here for offline use." />}
-              {browse.length > 200 && <div className="py-3 text-center text-[12px] text-ink-3">Showing 200 of {browse.length.toLocaleString()} · search to narrow down</div>}
+              {browseTotal === 0 && <EmptyState title="No foods here" body="Anything you log from USDA or Open Food Facts is saved here for offline use." />}
+              {browseTotal > 200 && <div className="py-3 text-center text-[12px] text-ink-3">Showing 200 of {browseTotal.toLocaleString()} · search to narrow down</div>}
             </div>
             <p className="text-[12px] text-ink-3">{(foods?.length ?? 0).toLocaleString()} foods on this device, searchable offline. Online results are cached the first time you log them.</p>
           </>

@@ -4,6 +4,8 @@ import { db, put } from "@/db";
 import type { Profile } from "@/db/types";
 import { defaultProfile } from "@/lib/bootstrap";
 import { subscribeSync, type SyncStatus, scheduleSync } from "@/lib/sync";
+import { getSearchIndex, subscribeSearchIndex, type IndexRow } from "@/lib/searchIndex";
+import type { Food } from "@/db/types";
 
 export function useProfile(): Profile {
   const p = useLiveQuery(() => db.profile.get("me"), []);
@@ -72,4 +74,30 @@ export function useNow(intervalMs = 1000): number {
     return () => clearInterval(t);
   }, [intervalMs]);
   return now;
+}
+
+/** All foods' searchable fields from the in-memory index (cheap; re-renders on writes). */
+export function useIndexRows(): IndexRow[] | undefined {
+  const [rows, setRows] = useState<IndexRow[] | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    const load = () => { getSearchIndex().then((m) => { if (alive) setRows([...m.values()]); }); };
+    load();
+    const unsub = subscribeSearchIndex(load);
+    return () => { alive = false; unsub(); };
+  }, []);
+  return rows;
+}
+
+/** Full Food rows for a bounded list of ids (keeps order). */
+export function useFoodsByIds(ids: string[]): Food[] {
+  const [foods, setFoods] = useState<Food[]>([]);
+  const key = ids.join("|");
+  useEffect(() => {
+    let alive = true;
+    if (!ids.length) { setFoods([]); return; }
+    db.foods.bulkGet(ids).then((rows) => { if (alive) setFoods(rows.filter((f): f is Food => !!f)); });
+    return () => { alive = false; };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  return foods;
 }

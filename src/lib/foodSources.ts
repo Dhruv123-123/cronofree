@@ -100,7 +100,12 @@ function offServings(p: OffProduct, id: string): Serving[] {
   const sq = num(p.serving_quantity);
   const unit = String(p.serving_quantity_unit ?? "g");
   const label = typeof p.serving_size === "string" ? p.serving_size.trim() : "";
-  if (sq && sq > 0 && (unit === "g" || unit === "ml")) out.push({ id: `${id}_serving`, label: label ? `1 serving (${label})` : "1 serving", grams: sq });
+  if (sq && sq > 0 && (unit === "g" || unit === "ml")) {
+    // OFF serving_size is free text like "1 slice (43 g)" or "28 g" — reuse it when it already names a household unit
+    const clean = label.replace(/\s+/g, " ");
+    const pretty = /^\d+(\.\d+)?\s*(g|ml|oz)\b/i.test(clean) || !clean ? `1 serving${clean ? ` (${clean})` : ""}` : /^\d/.test(clean) ? clean : `1 ${clean}`;
+    out.push({ id: `${id}_serving`, label: pretty.replace(/\b(\d+) serving \(1 serving/i, "$1 serving ("), grams: sq });
+  }
   const pq = num(p.product_quantity);
   if (pq && pq > 0 && pq < 5000 && (!sq || Math.abs(pq - sq) > 1)) out.push({ id: `${id}_pack`, label: `Whole package (${Math.round(pq)} ${String(p.product_quantity_unit ?? "g")})`, grams: pq });
   out.push({ id: `${id}_g100`, label: "100 g", grams: 100 });

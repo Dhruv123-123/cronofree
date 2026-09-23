@@ -6,6 +6,7 @@
  */
 import { db, COLLECTIONS, table, kvGet, kvSet } from "@/db";
 import type { Base, Collection } from "@/db/types";
+import { invalidateSearchIndex } from "./searchIndex";
 
 export interface SyncConfig {
   url: string; // "" = same origin
@@ -128,6 +129,7 @@ export async function syncNow(opts: { silent?: boolean } = {}): Promise<SyncStat
           applied += toPut.length;
         });
       }
+      if (byCollection.has("foods")) invalidateSearchIndex();
       // clear outbox entries we pushed (unless they were modified again during the request)
       const now = await db.outbox.toArray();
       const clear = now.filter((o) => pushedKeys.has(o.key) && o.at <= (outbox.find((x) => x.key === o.key)?.at ?? 0)).map((o) => o.key);
@@ -200,6 +202,7 @@ export async function importAll(data: Record<string, unknown>, opts: { queue?: b
       n += toPut.length;
     }
   }
+  invalidateSearchIndex();
   scheduleSync();
   return n;
 }

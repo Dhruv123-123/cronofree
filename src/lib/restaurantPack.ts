@@ -1,5 +1,6 @@
 /** Offline restaurant pack (public/data/restaurants.json): vegetarian menu items near campus and select SF spots. */
 import { db, kvGet, kvSet } from "@/db";
+import { invalidateSearchIndex } from "./searchIndex";
 import { restaurantFoods, type RestaurantPack } from "./restaurantTransform";
 
 export interface RestaurantInfo { version: number; restaurants: number; items: number; installedAt: number }
@@ -24,6 +25,7 @@ export function installRestaurantPack(opts: { force?: boolean } = {}): Promise<R
       const stale = await db.foods.where("source").equals("restaurant").filter((f) => !ids.has(f.id) && (f.useCount ?? 0) === 0 && !f.favorite).primaryKeys();
       if (stale.length) await db.foods.bulkDelete(stale);
       const next: RestaurantInfo = { version: pack.version, restaurants: pack.restaurants.length, items: foods.length, installedAt: Date.now() };
+      invalidateSearchIndex();
       await kvSet("restaurantPackInfo", next);
       return next;
     } finally { running = null; }

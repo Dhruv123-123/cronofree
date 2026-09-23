@@ -5,6 +5,7 @@ import { offSearch, usdaSearch, offLookupBarcode, nutritionixSearch, type Source
 import { uid } from "./id";
 import { nowHHMM } from "./dates";
 import { scheduleSync } from "./sync";
+import { getSearchIndex, type IndexRow } from "./searchIndex";
 
 /* ───────────────────────────── Search ───────────────────────────── */
 export interface SearchResult {
@@ -21,7 +22,7 @@ const MEAT_RE = /\b(chicken|beef|pork|bacon|ham|turkey|steak|carnitas|barbacoa|s
 const DAIRY_EGG_RE = /\b(cheese|milk|butter|cream|yogurt|egg|whey|casein|ghee|paneer|honey)\b/;
 export interface SearchOpts { diet?: "none" | "vegetarian" | "vegan" }
 
-function scoreLocal(f: Food, toks: string[], q: string, opts: SearchOpts = {}): number {
+function scoreLocal(f: IndexRow, toks: string[], q: string, opts: SearchOpts = {}): number {
   const s = f.search;
   let score = 0;
   if (opts.diet && opts.diet !== "none" && f.source !== "restaurant") {
@@ -49,13 +50,17 @@ export async function searchLocal(query: string, limit = 40, opts: SearchOpts = 
   const q = query.trim().toLowerCase();
   const toks = tokens(q);
   if (!toks.length) return [];
-  const all = await db.foods.filter((f) => !f.deletedAt && toks.every((t) => f.search.includes(t))).toArray();
-  return all
-    .map((f) => ({ f, s: scoreLocal(f, toks, q, opts) }))
-    .filter((x) => x.s >= -30 || toks.some((t) => MEAT_RE.test(t)))
-    .sort((a, b) => b.s - a.s)
-    .slice(0, limit)
-    .map((x) => x.f);
+  const index = await getSearchIndex();
+  const scored: { f: IndexRow; s: number }[] = [];
+  for (const f of index.values()) {
+    if (!toks.every((t) => f.search.includes(t))) continue;
+    const sc = scoreLocal(f, toks, q, opts);
+    if (sc >= -30 || toks.some((t) => MEAT_RE.test(t))) scored.push({ f, s: sc });
+  }
+  scored.sort((a, b) => b.s - a.s);
+  const ids = scored.slice(0, limit).map((x) => x.f.id);
+  const foods = await db.foods.bulkGet(ids);
+  return foods.filter((f): f is Food => !!f && !f.deletedAt);
 }
 
 export async function getSourceSettings(): Promise<SourceSettings> {

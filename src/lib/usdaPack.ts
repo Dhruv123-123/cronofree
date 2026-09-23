@@ -4,6 +4,7 @@
  * changes) so search and the nutrient finder work with no network at all.
  */
 import { db, kvGet, kvSet } from "@/db";
+import { invalidateSearchIndex } from "./searchIndex";
 import type { Food, Serving } from "@/db/types";
 import type { Nutrients } from "./nutrients";
 
@@ -71,6 +72,7 @@ export function installUsdaPack(opts: { force?: boolean; onProgress?: (done: num
         setProgress({ installing: true, done: Math.min(pack.foods.length, i + CHUNK), total: pack.foods.length });
       }
       const next: PackInfo = { version: pack.version, count: pack.count, installedAt: Date.now(), generatedAt: pack.generatedAt, datasets: pack.datasets };
+      invalidateSearchIndex();
       await kvSet("usdaPackInfo", next);
       return next;
     } finally {
@@ -113,6 +115,7 @@ export function installBrandedPack(opts: { force?: boolean; onProgress?: (done: 
         setProgress({ installing: true, done: Math.min(pack.foods.length, i + CHUNK), total: pack.foods.length });
       }
       const next: BrandedInfo = { version: pack.version, count: pack.count, installedAt: Date.now() };
+      invalidateSearchIndex();
       await kvSet("brandedPackInfo", next);
       return next;
     } finally {
