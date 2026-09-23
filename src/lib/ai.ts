@@ -67,27 +67,37 @@ export function extractJson(text: string): unknown {
 interface Msg { role: "system" | "user"; content: string }
 
 /** Ask the model for a JSON object. Tries the Responses API with web search first (when enabled), then plain chat completions. */
-export async function askJson(messages: Msg[], opts: { config?: AiConfig } = {}): Promise<{ data: unknown; usedWebSearch: boolean; model: string }> {
+export async function askJson(messages: Msg[], opts: { config?: AiConfig } = {}): Promise<{ data: unknown; usedWebSearch: boolean; model: string; citations?: string[] }> {
   const c = opts.config ?? (await getAiConfig());
   if (!c.apiKey) throw new Error("Add your AI provider under You → AI assistant first.");
   const base = baseUrl(c);
   const isSearchModel = /search-preview/i.test(c.model);
 
   if (c.webSearch && !isSearchModel) {
-    const url = c.provider === "azure" ? `${base}/openai/v1/responses?api-version=preview` : `${base}/v1/responses`;
-    const body = JSON.stringify({ model: c.model, input: messages.map((m) => ({ role: m.role === "system" ? "developer" : "user", content: m.content })), tools: [{ type: "web_search_preview" }], text: { format: { type: "json_object" } } });
-    try {
-      const r = await relayFetch(url, { headers: { "Content-Type": "application/json", ...authHeaders(c) }, body }, c.transport);
-      if (r.status < 400) {
-        const j = JSON.parse(r.text) as { output_text?: string; output?: { type: string; content?: { type: string; text?: string }[] }[] };
-        const text = j.output_text ?? j.output?.flatMap((o) => o.content ?? []).map((p) => p.text ?? "").join("") ?? "";
-        if (text) return { data: extractJson(text), usedWebSearch: true, model: c.model };
-      } else if (r.status === 401 || r.status === 403) {
-        throw new Error(`Provider rejected the key (${r.status}).`);
+    // Azure: https://learn.microsoft.com/azure/foundry/openai/how-to/web-search — tool type "web_search" on the v1 Responses endpoint,
+    // Bing-grounded, GPT-4-class models and later. OpenAI uses the same tool name; "web_search_preview" is the legacy alias.
+    const url = c.provider === "azure" ? `${base}/openai/v1/responses` : `${base}/v1/responses`;
+    const input = messages.map((m) => ({ role: m.role === "system" ? "developer" : "user", content: m.content }));
+    for (const toolType of ["web_search", "web_search_preview"]) {
+      const tool: Record<string, unknown> = { type: toolType };
+      if (toolType === "web_search") tool.user_location = { type: "approximate", country: "US", city: "Berkeley", region: "California", timezone: "America/Los_Angeles" };
+      const body: Record<string, unknown> = { model: c.model, input, tools: [tool], tool_choice: "auto" };
+      if (toolType === "web_search") body.include = ["web_search_call.action.sources"];
+      try {
+        const r = await relayFetch(url, { headers: { "Content-Type": "application/json", ...authHeaders(c) }, body: JSON.stringify(body) }, c.transport);
+        if (r.status === 401 || r.status === 403) throw new Error(`Provider rejected the key (${r.status}).`);
+        if (r.status >= 400) continue; // tool/endpoint not supported here → try the next shape
+        const j = JSON.parse(r.text) as { output_text?: string; output?: { type: string; content?: { type: string; text?: string; annotations?: { type: string; url?: string; title?: string }[] }[]; action?: { sources?: { url: string }[] } }[] };
+        const items = j.output ?? [];
+        const parts = items.filter((o) => o.type === "message").flatMap((o) => o.content ?? []);
+        const text = j.output_text ?? parts.map((p) => p.text ?? "").join("");
+        if (!text) continue;
+        const searched = items.some((o) => o.type === "web_search_call");
+        const citations = [...new Set([...parts.flatMap((p) => (p.annotations ?? []).filter((a) => a.type === "url_citation" && a.url).map((a) => a.url as string)), ...items.flatMap((o) => o.action?.sources?.map((x) => x.url) ?? [])])];
+        return { data: extractJson(text), usedWebSearch: searched, model: c.model, citations };
+      } catch (e) {
+        if (/rejected the key|relay|Sync/.test((e as Error).message)) throw e;
       }
-      // 400/404 → this deployment/API doesn't support web search; fall back
-    } catch (e) {
-      if (/rejected the key|relay|Sync/.test((e as Error).message)) throw e;
     }
   }
 
@@ -103,7 +113,7 @@ export async function askJson(messages: Msg[], opts: { config?: AiConfig } = {})
   }
   const j = JSON.parse(r.text) as { choices?: { message?: { content?: string } }[] };
   const text = j.choices?.[0]?.message?.content ?? "";
-  return { data: extractJson(text), usedWebSearch: isSearchModel, model: c.model };
+  return { data: extractJson(text), usedWebSearch: isSearchModel, model: c.model, citations: [] };
 }
 
 /* ─────────────────────────── food tasks ─────────────────────────── */
@@ -120,12 +130,14 @@ function toCandidate(x: Record<string, unknown>): AiCandidate | null {
 }
 
 export async function aiLookupFood(query: string, context?: string): Promise<{ candidates: AiCandidate[]; usedWebSearch: boolean; model: string }> {
-  const { data, usedWebSearch, model } = await askJson([
+  const { data, usedWebSearch, model, citations } = await askJson([
     { role: "system", content: "You are a nutrition database assistant for a food-logging app. Given a food, dish, menu item or packaged product, return the best matches as JSON: {\"candidates\":[{\"name\",\"brand\",\"serving\",\"grams\",\"kcal\",\"protein\",\"carbs\",\"fat\",\"fiber\",\"sugar\",\"sodium\",\"source\",\"confidence\",\"note\"}]}. Rules: numbers are per ONE serving as a person would order or eat it; grams is the serving weight; kcal/protein/carbs/fat are required numbers; prefer official data (restaurant nutrition pages, manufacturer labels, USDA) and cite the URL in source; if you must estimate, say so in note and set confidence low or medium; up to 5 candidates, most likely first; vegetarian options first when the item has variants; return ONLY JSON." },
     { role: "user", content: `${query}${context ? `\nContext: ${context}` : ""}` },
   ]);
   const list = Array.isArray((data as { candidates?: unknown[] })?.candidates) ? (data as { candidates: Record<string, unknown>[] }).candidates : [];
-  return { candidates: list.map(toCandidate).filter((c): c is AiCandidate => !!c), usedWebSearch, model };
+  const candidates = list.map(toCandidate).filter((c): c is AiCandidate => !!c);
+  if (citations?.length) for (const cand of candidates) if (!cand.source) cand.source = citations[0];
+  return { candidates, usedWebSearch, model };
 }
 
 export interface AiMealItem extends AiCandidate { text: string }
@@ -141,6 +153,6 @@ export async function aiParseMeal(description: string): Promise<{ items: AiMealI
 }
 
 export async function testAi(config: AiConfig): Promise<string> {
-  const { data, usedWebSearch, model } = await askJson([{ role: "system", content: "Reply with JSON {\"ok\":true,\"model\":\"<your model name>\"}." }, { role: "user", content: "ping" }], { config });
-  return `Connected · ${model}${usedWebSearch ? " · web search available" : " · chat only (no web search)"}${(data as { ok?: boolean })?.ok ? "" : " · unexpected reply"}`;
+  const { data, usedWebSearch, model } = await askJson([{ role: "system", content: "Search the web for today's top news headline, then reply ONLY with JSON {\"ok\":true,\"headline\":\"<headline>\"}." }, { role: "user", content: "ping" }], { config });
+  return `Connected · ${model}${usedWebSearch ? " · web search confirmed (Bing-grounded)" : config.webSearch ? " · responded without a web search (tool may be blocked for this deployment, or the model chose not to search)" : " · chat only"}${(data as { ok?: boolean })?.ok ? "" : " · unexpected reply"}`;
 }

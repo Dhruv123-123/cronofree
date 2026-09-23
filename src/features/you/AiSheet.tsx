@@ -36,7 +36,7 @@ export default function AiSheet({ open, onClose }: { open: boolean; onClose: () 
               <Field label="API version"><Input value={c.apiVersion} onChange={(e) => set({ apiVersion: e.target.value })} autoCapitalize="none" /></Field>
             </div>
             <Field label="Authentication"><Segmented value={c.authMode} onChange={(v) => set({ authMode: v })} options={[{ value: "api-key", label: "API key" }, { value: "bearer", label: "Entra ID token" }]} className="w-full" /></Field>
-            <Field label={c.authMode === "api-key" ? "API key" : "Bearer token"} hint={c.authMode === "bearer" ? "An Entra access token for https://cognitiveservices.azure.com/.default. Tokens expire; API keys are simpler for a personal app." : undefined}><Input type="password" value={c.apiKey} onChange={(e) => set({ apiKey: e.target.value })} autoCapitalize="none" spellCheck={false} /></Field>
+            <Field label={c.authMode === "api-key" ? "API key" : "Bearer token"} hint={c.authMode === "bearer" ? "An Entra access token for scope https://ai.azure.com/.default (az account get-access-token --scope https://ai.azure.com/.default). Tokens expire hourly; API keys are simpler for a personal app." : "Keys and Endpoint → KEY 1."}><Input type="password" value={c.apiKey} onChange={(e) => set({ apiKey: e.target.value })} autoCapitalize="none" spellCheck={false} /></Field>
           </>
         ) : (
           <>
@@ -45,7 +45,7 @@ export default function AiSheet({ open, onClose }: { open: boolean; onClose: () 
             <Field label="API key"><Input type="password" value={c.apiKey} onChange={(e) => set({ apiKey: e.target.value })} autoCapitalize="none" spellCheck={false} /></Field>
           </>
         )}
-        <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>Use web search when available</div><div className="text-[12px] text-ink-3">Tries the Responses API web_search tool first, falls back to plain chat.</div></div><Toggle checked={c.webSearch} onChange={(v) => set({ webSearch: v })} /></div>
+        <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>Use web search</div><div className="text-[12px] text-ink-3">Responses API <code className="mono">web_search</code> tool (on Azure: Bing-grounded, GPT-4-class models and later, billed per Bing request). Falls back to plain chat if the tool is blocked.</div></div><Toggle checked={c.webSearch} onChange={(v) => set({ webSearch: v })} /></div>
         <Field label="Transport"><Segmented value={c.transport} onChange={(v) => set({ transport: v })} options={[{ value: "auto", label: "Auto" }, { value: "direct", label: "Direct" }, { value: "proxy", label: "Via sync server" }]} className="w-full" /></Field>
         {result && <div className={`flex items-start gap-2 text-[13px] ${result.ok ? "text-good" : "text-bad"}`}>{result.ok && <Check size={14} className="mt-0.5 shrink-0" />}<span>{result.msg}</span></div>}
       </div>

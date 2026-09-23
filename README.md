@@ -53,7 +53,7 @@ The script downloads the official FoodData Central releases, cleans portions, an
 
 You → **AI assistant**: paste an Azure OpenAI endpoint + deployment + key (or an OpenAI / OpenAI-compatible key). A cheap model is plenty (gpt-4o-mini, gpt-4.1-mini, gpt-5-mini). Two things turn on:
 
-- **Ask AI** appears under every search. The model looks the item up, using its web search tool when the deployment supports it (Responses API `web_search_preview`, or OpenAI's `gpt-4o-mini-search-preview`), and returns per-serving calories and macros with a source link and a confidence label. "Save & add" keeps it in My foods.
+- **Ask AI** appears under every search. The model looks the item up with the Responses API `web_search` tool (on Azure this is Bing-grounded and works with GPT-4-class models and later; on OpenAI the same tool, or `gpt-4o-mini-search-preview`), and returns per-serving calories and macros with a citation and a confidence label. "Save & add" keeps it in My foods. Azure bills web search per Bing request on top of tokens; a subscription admin can block the tool, in which case the app falls back to plain chat and says so in Test.
 - **Describe a meal**: "two eggs with cheddar, sourdough toast with butter, 16 oz oat latte" becomes separate items with amounts you can tick and log. If a library food matches, it offers that instead.
 
 Keys stay on the device (local storage, never synced). Calls go straight to the provider; if the provider blocks browser requests, they are relayed through your sync server's `/api/ai` (local Node or the Netlify function), which only forwards to an allow-list of AI hosts and never stores a key.
