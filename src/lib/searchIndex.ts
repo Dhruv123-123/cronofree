@@ -12,6 +12,7 @@ export type IndexRow = Pick<Food, "id" | "name" | "search" | "source" | "brand" 
 let rows: Map<string, IndexRow> | null = null;
 let building: Promise<Map<string, IndexRow>> | null = null;
 let version = 0;
+let dirty = false;
 const listeners = new Set<() => void>();
 
 /** Fold apostrophes/diacritics so "joe's", "joe’s" and "joes" all match. Apply the same to queries. */
@@ -22,9 +23,15 @@ export function getSearchIndex(): Promise<Map<string, IndexRow>> {
   if (rows) return Promise.resolve(rows);
   if (building) return building;
   building = (async () => {
-    const m = new Map<string, IndexRow>();
-    // Dexie's each() streams rows without materialising a 25k-element array
-    await db.foods.each((f) => { if (!f.deletedAt) m.set(f.id, project(f)); });
+    let m: Map<string, IndexRow>;
+    // Dexie's each() streams rows without materialising a 25k-element array.
+    // A pack install that finishes mid-stream invalidates us again; loop until
+    // a pass completes with no invalidation, or that install's rows are missed.
+    do {
+      dirty = false;
+      m = new Map<string, IndexRow>();
+      await db.foods.each((f) => { if (!f.deletedAt) m.set(f.id, project(f)); });
+    } while (dirty);
     rows = m;
     building = null;
     bump();
@@ -44,8 +51,22 @@ export function indexUpsert(foods: Food[]): void {
   bump();
 }
 
-/** After a bulk install, rebuild lazily on next use. */
+/** After a bulk install or sync, drop the index and rebuild it in idle time so the next search is instant. */
 export function invalidateSearchIndex(): void {
   rows = null;
+  dirty = true;
   bump();
+  warmSearchIndex();
 }
+
+/** Kick off the build without waiting for it. Safe to call often. */
+export function warmSearchIndex(): void {
+  if (rows || building) return;
+  // Start on the next tick: the build streams rows through IndexedDB cursor callbacks,
+  // so it never blocks the UI for long, and finishing it before the first keystroke
+  // beats waiting for an idle slot that a running pack install rarely yields.
+  setTimeout(() => { getSearchIndex().catch(() => undefined); }, 0);
+}
+
+/** Read-only peek for debugging from the console: `__cronofreeIndex()`. */
+(globalThis as { __cronofreeIndex?: () => unknown }).__cronofreeIndex = () => ({ size: rows?.size ?? null, building: !!building, dirty, version });

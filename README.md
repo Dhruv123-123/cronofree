@@ -44,7 +44,7 @@ Rebuild or extend it any time:
 
 ```bash
 npm run usda      # SR Legacy + Foundation + FNDDS
-npm run branded   # public/data/branded-pack.json: 11,000 most-scanned US products from 200+ brands (Trader Joe's, Kirkland, Clif, Chobani, Oatly, Beyond, Amy's…) via Open Food Facts, vegetarian-filtered (≈30 min first run, cached after)
+npm run branded   # public/data/branded-pack.json: 11,144 most-scanned US products from 200+ brands (Trader Joe's, Kirkland, Clif, Chobani, Oatly, Beyond, Amy's…) via Open Food Facts, vegetarian-filtered (≈30 min first run, cached after)
 ```
 
 The script downloads the official FoodData Central releases, cleans portions, and writes the pack (and a pre-gzipped twin the server streams). Anything not in the pack is still one search away online, and packaged products come from Open Food Facts by barcode.

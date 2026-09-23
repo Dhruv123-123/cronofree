@@ -15,7 +15,7 @@ export interface SearchResult {
 }
 
 function tokens(q: string): string[] {
-  return q.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
+  return normSearch(q).split(/\s+/).filter(Boolean);
 }
 
 const MEAT_RE = /\b(chicken|beef|pork|bacon|ham|turkey|steak|carnitas|barbacoa|shrimp|prawn|fish|salmon|tuna|cod|crab|lobster|anchov|pepperoni|sausage|chorizo|lamb|duck|veal|gelatin|prosciutto|salami|meatball|pastrami|brisket|ribs?)\b/;

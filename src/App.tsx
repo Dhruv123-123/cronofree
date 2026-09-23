@@ -5,6 +5,7 @@ import { bootstrap } from "@/lib/bootstrap";
 import { startAutoSync } from "@/lib/sync";
 import { installUsdaPack, installBrandedPack } from "@/lib/usdaPack";
 import { installRestaurantPack } from "@/lib/restaurantPack";
+import { warmSearchIndex } from "@/lib/searchIndex";
 import { useProfile, useTheme } from "@/hooks";
 import { ToastProvider, Button } from "@/components/ui";
 import Shell from "@/components/Shell";
@@ -57,7 +58,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let stop = () => {};
-    bootstrap().then(() => { setReady(true); stop = startAutoSync(); setTimeout(() => { void installRestaurantPack().catch(console.error); installUsdaPack().catch(console.error).then(() => installBrandedPack().catch(console.error)); }, 1500); }).catch((e) => { console.error(e); setReady(true); });
+    bootstrap().then(() => { setReady(true); warmSearchIndex(); stop = startAutoSync(); setTimeout(() => { void installRestaurantPack().catch(console.error); installUsdaPack().catch(console.error).then(() => installBrandedPack().catch(console.error)); }, 1500); }).catch((e) => { console.error(e); setReady(true); });
     return () => stop();
   }, []);
   if (!ready) return <Loading />;
