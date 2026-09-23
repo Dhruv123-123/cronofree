@@ -14,7 +14,9 @@ let building: Promise<Map<string, IndexRow>> | null = null;
 let version = 0;
 const listeners = new Set<() => void>();
 
-const project = (f: Food): IndexRow => ({ id: f.id, name: f.name, search: f.search, source: f.source, brand: f.brand, category: f.category, useCount: f.useCount, favorite: f.favorite, lastUsedAt: f.lastUsedAt, verified: f.verified, deletedAt: f.deletedAt, vegan: f.vegan });
+/** Fold apostrophes/diacritics so "joe's", "joe’s" and "joes" all match. Apply the same to queries. */
+export const normSearch = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/['’`´]/g, "");
+const project = (f: Food): IndexRow => ({ id: f.id, name: f.name, search: normSearch(f.search ?? f.name), source: f.source, brand: f.brand, category: f.category, useCount: f.useCount, favorite: f.favorite, lastUsedAt: f.lastUsedAt, verified: f.verified, deletedAt: f.deletedAt, vegan: f.vegan });
 
 export function getSearchIndex(): Promise<Map<string, IndexRow>> {
   if (rows) return Promise.resolve(rows);

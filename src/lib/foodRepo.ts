@@ -5,7 +5,7 @@ import { offSearch, usdaSearch, offLookupBarcode, nutritionixSearch, type Source
 import { uid } from "./id";
 import { nowHHMM } from "./dates";
 import { scheduleSync } from "./sync";
-import { getSearchIndex, type IndexRow } from "./searchIndex";
+import { getSearchIndex, normSearch, type IndexRow } from "./searchIndex";
 
 /* ───────────────────────────── Search ───────────────────────────── */
 export interface SearchResult {
