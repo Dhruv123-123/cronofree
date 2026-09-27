@@ -6,3 +6,7 @@ server/data
 .DS_Store
 .env
 .cache
+*.tsbuildinfo
+android/app/build
+ios/App/build
+ios/App/Pods

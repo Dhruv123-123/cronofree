@@ -78,6 +78,20 @@ The app installs the pack on launch and refreshes it whenever the file changes.
 - **On your computer:** `server/data/store.json`, one JSON document, written atomically. Back it up like any file.
 - **Backups:** You → Your data → *Download backup* gives you a full JSON snapshot; *Restore* merges it back (newer records win). *Export diary (CSV)* for spreadsheets.
 
+### Make it an app on your phone
+
+**Installed web app (recommended, 30 seconds).** Open your hosted URL on the phone. The diary shows an *Install Cronofree* card: on Android and desktop Chrome it triggers the real install prompt; on iPhone it walks you through Safari → Share → *Add to Home Screen*. Installed, it launches full-screen from its own icon, works offline (the whole 25k-food library is on the device), scans barcodes, and offers long-press shortcuts for *Log food*, *Log weight* and *Start workout*. The shell disables rubber-band scrolling, pull-to-refresh, tap flashes and text-selection on controls, and gives a short haptic tick on confirmations, so it feels native.
+
+**Native Android / iOS build (Capacitor).** The same web build wrapped in a native shell, for an APK you can sideload or publish, or an Xcode project for TestFlight.
+
+```bash
+npm run android:apk      # builds dist/, syncs it into android/, runs Gradle → android/app/build/outputs/apk/debug/app-debug.apk
+npm run android          # …or open the project in Android Studio (needs the Android SDK)
+npx cap add ios && npm run ios   # on a Mac with Xcode; then Product → Run on your iPhone
+```
+
+The native build carries no server of its own: set **You → Sync → Server URL** to your Vercel / Netlify address (or your computer's tunnel URL) for sync, the AI relay and recipe import. Direct AI calls, offline search and everything else work without it. Icons and splash screens are generated from `assets/` with `npx @capacitor/assets generate`.
+
 ### Free hosting on Vercel (with sync, no computer needed)
 
 1. In Vercel: *Add New → Project → Import* the GitHub repo. The build settings come from `vercel.json`; nothing to type. Deploy.

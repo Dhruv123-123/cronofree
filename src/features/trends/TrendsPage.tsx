@@ -24,7 +24,8 @@ type Tab = "weight" | "nutrition" | "calendar" | "body" | "photos";
 const RANGES = [{ v: 14, l: "2w" }, { v: 30, l: "1m" }, { v: 90, l: "3m" }, { v: 365, l: "1y" }];
 
 export default function TrendsPage() {
-  const [tab, setTab] = useState<Tab>("weight");
+  const initialTab = (new URLSearchParams(location.search).get("tab") as Tab | null) ?? "weight";
+  const [tab, setTab] = useState<Tab>(["weight", "nutrition", "calendar", "body", "photos"].includes(initialTab) ? initialTab : "weight");
   return (
     <>
       <PageHeader title="Trends" sub="Progress">
@@ -47,7 +48,7 @@ function WeightTab() {
   const toast = useToast();
   const c = useCheckin(profile);
   const [range, setRange] = useState(30);
-  const [log, setLog] = useState(false);
+  const [log, setLog] = useState(() => new URLSearchParams(location.search).get("log") === "1");
   const [showAll, setShowAll] = useState(false);
   const unit = profile.units.weight;
   const u = (kg: number) => Math.round(kgToUnit(kg, unit) * 10) / 10;

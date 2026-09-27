@@ -7,6 +7,7 @@ import { ACTIVITY_LABELS } from "@/lib/energy";
 import { kgToUnit, cmToUnit, unitToCm, fmt } from "@/lib/units";
 import { getSyncConfig, setSyncConfig, syncNow, testConnection, exportAll, importAll, wipeLocal } from "@/lib/sync";
 import { kvGet, kvSet, db } from "@/db";
+import { isNative } from "@/lib/install";
 import { formatTime } from "@/lib/dates";
 import { PageHeader, Page } from "@/components/Shell";
 import { Button, Sheet, Field, Input, NumberInput, Segmented, Toggle, Confirm, useToast, Row } from "@/components/ui";
@@ -236,7 +237,8 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => { if (open) { setLoaded(false); getSyncConfig().then((c) => { setUrl(c.url); setToken(c.token); setAuto(c.autoSync); setTest(null); setLoaded(true); }); } }, [open]);
-  const sameOrigin = location.pathname && !/^https?:\/\/localhost:5173/.test(location.origin);
+  const native = isNative();
+  const sameOrigin = !native && location.pathname && !/^https?:\/\/localhost:5173/.test(location.origin);
   async function save() {
     await setSyncConfig({ url: url.trim(), token: token.trim(), autoSync: auto });
     toast("Sync settings saved");
@@ -255,7 +257,7 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           </ol>
           <p className="mt-2">Everything stays local-first: you can log offline and it merges when you're back on the network. Newer edits win.</p>
         </div>
-        {loaded && <><Field label="Server URL" hint={sameOrigin ? "Leave blank to use the address this app was opened from." : "e.g. http://192.168.1.20:8787 or your Tailscale / tunnel address"}><Input placeholder={location.origin} value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" autoCapitalize="none" /></Field>
+        {loaded && <><Field label="Server URL" hint={sameOrigin ? "Leave blank to use the address this app was opened from." : native ? "Your hosted site, e.g. https://cronofree.vercel.app (the app build has no server of its own)" : "e.g. http://192.168.1.20:8787 or your Tailscale / tunnel address"}><Input placeholder={native ? "https://your-site.vercel.app" : location.origin} value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" autoCapitalize="none" /></Field>
         <Field label="Pairing token"><Input value={token} onChange={(e) => setToken(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="printed by the server" /></Field>
         <div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><span>Sync automatically</span><Toggle checked={auto} onChange={setAuto} /></div></>}
         {test && <div className={`flex items-center gap-2 text-[13px] ${test.ok ? "text-good" : "text-bad"}`}>{test.ok && <Check size={14} />}{test.message}</div>}

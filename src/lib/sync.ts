@@ -5,6 +5,7 @@
  * deletions are tombstones so they propagate.
  */
 import { db, COLLECTIONS, table, kvGet, kvSet } from "@/db";
+import { isNative } from "./install";
 import type { Base, Collection } from "@/db/types";
 import { invalidateSearchIndex } from "./searchIndex";
 
@@ -63,6 +64,7 @@ export async function refreshPending(): Promise<number> {
 
 function apiUrl(cfg: SyncConfig, path: string): string {
   const base = cfg.url.trim().replace(/\/+$/, "");
+  if (!base && isNative()) throw new Error("In the app build, enter your server URL (for example https://your-site.vercel.app) under You → Sync.");
   return `${base}${path}`;
 }
 

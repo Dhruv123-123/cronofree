@@ -14,9 +14,14 @@
     "test": "node --experimental-strip-types --no-warnings --test tests/*.test.mjs",
     "restaurants": "node --experimental-strip-types --no-warnings scripts/build-restaurant-pack.mjs",
     "usda": "node --experimental-strip-types --no-warnings --max-old-space-size=8192 scripts/build-usda-pack.mjs --survey",
-    "branded": "node --experimental-strip-types --no-warnings scripts/build-branded-pack.mjs"
+    "branded": "node --experimental-strip-types --no-warnings scripts/build-branded-pack.mjs",
+    "cap:sync": "npm run build && cap sync",
+    "android": "npm run cap:sync && cap open android",
+    "android:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug && echo APK: android/app/build/outputs/apk/debug/app-debug.apk",
+    "ios": "npm run cap:sync && cap open ios"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.2",
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
@@ -35,6 +40,8 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",

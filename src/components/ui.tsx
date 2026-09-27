@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, createContext, useContext, useCallback, type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes } from "react";
+import { haptic } from "@/lib/install";
 import { createPortal } from "react-dom";
 import { X, Check, AlertTriangle, Info } from "lucide-react";
 
@@ -217,6 +218,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const push = useCallback((text: string, kind: ToastKind = "ok", action?: Toast["action"]) => {
     const id = Date.now() + Math.random();
+    haptic(kind === "ok" ? "light" : kind === "warn" ? "warn" : "light");
     setToasts((t) => [...t.slice(-2), { id, text, kind, action }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 6000 : 2800);
   }, []);

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cronofree</string>
+    <string name="title_activity_main">Cronofree</string>
+    <string name="package_name">app.cronofree</string>
+    <string name="custom_url_scheme">app.cronofree</string>
+</resources>

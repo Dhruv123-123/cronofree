@@ -17,8 +17,12 @@ export default defineConfig({
         description: "Food and training log. Local-first, syncs with your own computer.",
         theme_color: "#0f1213",
         background_color: "#0f1213",
+        id: "/",
         display: "standalone",
+        display_override: ["standalone", "minimal-ui"],
         orientation: "portrait",
+        categories: ["health", "fitness", "food"],
+        lang: "en",
         start_url: "/",
         scope: "/",
         icons: [
@@ -28,8 +32,9 @@ export default defineConfig({
           { src: "/icons/icon.svg", sizes: "any", type: "image/svg+xml" },
         ],
         shortcuts: [
-          { name: "Log food", url: "/?add=1" },
-          { name: "Start workout", url: "/train" },
+          { name: "Log food", short_name: "Log", url: "/?add=1", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+          { name: "Log weight", short_name: "Weight", url: "/trends?tab=weight&log=1", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+          { name: "Start workout", short_name: "Train", url: "/train", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
         ],
       },
       workbox: {

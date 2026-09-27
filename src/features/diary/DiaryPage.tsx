@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useSearchParams } from "react-router-dom";
+import { InstallCard } from "@/components/InstallCard";
 import { ChevronLeft, ChevronRight, Plus, MoreHorizontal, Scale, ChevronDown, ChevronUp, Copy, Save, Trash2, CalendarDays, Flame } from "lucide-react";
 import { db, put } from "@/db";
 import type { DiaryEntry, Food } from "@/db/types";
@@ -135,6 +136,7 @@ export default function DiaryPage() {
       </PageHeader>
 
       <Page>
+        <InstallCard compact />
         {/* Summary */}
         <section className="card p-4 md:p-5">
           <div className="flex items-center gap-5">
