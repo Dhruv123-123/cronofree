@@ -18,6 +18,8 @@ import AiSheet from "./AiSheet";
 import { Sparkles } from "lucide-react";
 import { installUsdaPack, getPackInfo, type PackInfo, installBrandedPack, getBrandedInfo, type BrandedInfo } from "@/lib/usdaPack";
 import { installRestaurantPack, getRestaurantInfo, type RestaurantInfo } from "@/lib/restaurantPack";
+import { installExercisePack, getExercisePackInfo, type ExercisePackInfo } from "@/lib/exercisePack";
+import { storageState, requestPersistentStorage, fmtBytes, type StorageState } from "@/lib/storage";
 import { mealIdFor } from "@/lib/dayModel";
 import { getTrainPrefs, setTrainPrefs, convertTrainingUnits, DEFAULT_TRAIN_PREFS, type TrainPrefs } from "@/features/train/trainRepo";
 import type { SourceSettings } from "@/lib/foodSources";
@@ -42,6 +44,8 @@ export default function YouPage() {
   const [prof, setProf] = useState(false);
   const [prefs, setPrefs] = useState(false);
   const [sync, setSync] = useState(false);
+  const [stor, setStor] = useState<StorageState | null>(null);
+  useEffect(() => { storageState().then(setStor); }, []);
   const [sources, setSources] = useState(false);
   const [train, setTrain] = useState(false);
   const [confirmWipe, setConfirmWipe] = useState(false);
@@ -120,6 +124,7 @@ export default function YouPage() {
           <Row label="Export diary (CSV)" sub="Every food entry with macros" onClick={doExportCsv} />
           <Row label="Import from MyFitnessPal or Cronometer" sub="Their CSV exports become diary entries, weights and biometrics" onClick={() => setImportOpen(true)} />
           <Row label="Restore from backup" sub="Merges; newer records win" onClick={() => fileRef.current?.click()} />
+          <Row label={stor?.persisted ? "Storage: protected from eviction" : "Storage: best-effort"} sub={stor ? `${fmtBytes(stor.usage)} used${stor.quota ? ` of ${fmtBytes(stor.quota)}` : ""}${stor.persisted ? " · the browser won't clear it under storage pressure" : stor.persisted === false ? " · tap to request durable storage (granted to installed apps)" : ""}` : "Checking…"} onClick={async () => { await requestPersistentStorage(); setStor(await storageState()); }} />
           <Row label={<span className="text-bad">Erase data on this device</span>} sub="Your server copy is not touched" onClick={() => setConfirmWipe(true)} />
           <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={(e) => doImport(e.target.files?.[0])} />
         </Section>
@@ -276,7 +281,8 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const [branded, setBranded] = useState<BrandedInfo | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
-  useEffect(() => { if (open) { setLoaded(false); kvGet<SourceSettings>("foodSources", {}).then((c) => { setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c }); setLoaded(true); }); getPackInfo().then(setPack); getRestaurantInfo().then(setRest); getBrandedInfo().then(setBranded); } }, [open]);
+  useEffect(() => { if (open) { setLoaded(false); kvGet<SourceSettings>("foodSources", {}).then((c) => { setCfg({ offEnabled: true, usdaEnabled: true, usdaApiKey: "", ...c }); setLoaded(true); }); getPackInfo().then(setPack); getRestaurantInfo().then(setRest); getBrandedInfo().then(setBranded); getExercisePackInfo().then(setExPack); } }, [open]);
+  const [exPack, setExPack] = useState<ExercisePackInfo | null>(null);
   return (
     <Sheet open={open} onClose={onClose} title="Food sources" footer={<Button full variant="primary" onClick={async () => { await kvSet("foodSources", cfg); toast("Saved"); onClose(); }}>Save</Button>}>
       <div className="flex flex-col gap-3 text-[14px]">
@@ -294,6 +300,9 @@ function SourcesSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <div className="flex items-center justify-between"><div><div>Eat out · Berkeley & SF</div><div className="text-[12px] text-ink-3">{rest ? `${rest.restaurants} restaurants · ${rest.items} vegetarian items` : "Not installed"}</div></div>
             <Button size="sm" onClick={async () => { const r = await installRestaurantPack({ force: true }).catch(() => null); setRest(r); toast(r ? `Restaurants ready · ${r.items} items` : "No restaurant pack on this server.", r ? "ok" : "warn"); }}>{rest ? "Reinstall" : "Install"}</Button></div>
           <div className="mt-1 text-[12px] text-ink-3">Edit <code className="mono">data/restaurants/*.json</code> and run <code className="mono">npm run restaurants</code> to add places.</div>
+          <div className="mt-3 flex items-center justify-between"><div><div>Exercise catalog</div><div className="text-[12px] text-ink-3">{exPack ? `${exPack.count} movements with muscles, equipment and instructions` : "Not installed"}</div></div>
+            <Button size="sm" onClick={async () => { const r = await installExercisePack({ force: true }).catch(() => null); setExPack(r); toast(r ? `Exercise catalog ready · ${r.count} movements` : "No exercise pack on this server. Run npm run exercises.", r ? "ok" : "warn"); }}>{exPack ? "Reinstall" : "Install"}</Button></div>
+          <div className="mt-1 text-[12px] text-ink-3">Your edits and deletions are kept across reinstalls; only missing movements are added.</div>
         </div>
         {loaded && <><div className="flex items-center justify-between rounded-xl bg-raised px-3 py-2"><div><div>USDA FoodData Central</div><div className="text-[12px] text-ink-3">Whole foods with full vitamins & minerals</div></div><Toggle checked={cfg.usdaEnabled !== false} onChange={(v) => setCfg({ ...cfg, usdaEnabled: v })} /></div>
         <Field label="USDA API key (free)" hint="The shared DEMO_KEY allows ~30 searches an hour. Get your own in seconds at api.data.gov/signup."><Input value={cfg.usdaApiKey ?? ""} onChange={(e) => setCfg({ ...cfg, usdaApiKey: e.target.value })} autoCapitalize="none" spellCheck={false} placeholder="DEMO_KEY" /></Field>

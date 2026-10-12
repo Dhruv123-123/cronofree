@@ -203,6 +203,16 @@ export interface Exercise extends Base {
   increment: number; // in the user's weight unit
   notes?: string;
   builtin?: boolean;
+  /** Catalog metadata (from the offline exercise pack); absent on hand-made exercises. */
+  equipment?: string; // barbell, dumbbell, cable, machine, bodyweight, kettlebell, bands, other
+  primary?: string[]; // specific muscles, e.g. ["quadriceps"]
+  secondary?: string[];
+  instructions?: string[];
+  level?: "beginner" | "intermediate" | "expert";
+  mechanic?: "compound" | "isolation";
+  category?: string; // strength, stretching, plyometrics, powerlifting, olympic weightlifting, strongman, cardio
+  aliases?: string[]; // other common names, searchable
+  source?: "pack";
 }
 
 export interface ProgramDay {

@@ -44,6 +44,7 @@ Rebuild or extend it any time:
 
 ```bash
 npm run usda      # SR Legacy + Foundation + FNDDS
+npm run exercises # public/data/exercises.json: 916 movements (free-exercise-db, public domain, + Cronofree extras) with muscles, equipment, instructions and gym-name aliases ("RDL", "OHP", "Bulgarian split squat")
 npm run branded   # public/data/branded-pack.json: 11,144 most-scanned US products from 200+ brands (Trader Joe's, Kirkland, Clif, Chobani, Oatly, Beyond, Amy's…) via Open Food Facts, vegetarian-filtered (≈30 min first run, cached after)
 ```
 

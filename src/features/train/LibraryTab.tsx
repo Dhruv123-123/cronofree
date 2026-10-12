@@ -4,6 +4,7 @@ import { Plus, Search } from "lucide-react";
 import { db } from "@/db";
 import type { Exercise } from "@/db/types";
 import { MUSCLE_GROUPS } from "@/lib/liftingDefaults";
+import { EQUIPMENT_GROUPS, exerciseScore } from "@/lib/exerciseTransform";
 import { exerciseHistory, bestPR } from "@/lib/lifting";
 import { useProfile } from "@/hooks";
 import { Page } from "@/components/Shell";
@@ -17,9 +18,23 @@ export default function LibraryTab() {
   const workouts = useLiveQuery(() => db.workouts.filter((w) => !w.deletedAt).toArray(), []) ?? [];
   const [q, setQ] = useState("");
   const [muscle, setMuscle] = useState("all");
+  const [equip, setEquip] = useState("all");
+  const [showAll, setShowAll] = useState(false);
   const [edit, setEdit] = useState<Exercise | null>(null);
   const [del, setDel] = useState<Exercise | null>(null);
-  const list = useMemo(() => exercises.filter((e) => (muscle === "all" || e.muscle === muscle) && (!q || e.name.toLowerCase().includes(q.toLowerCase()))).sort((a, b) => a.name.localeCompare(b.name)), [exercises, q, muscle]);
+  const usedIds = useMemo(() => new Set(workouts.flatMap((w) => w.exercises.map((x) => x.exerciseId))), [workouts]);
+  const list = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    const toks = ql.split(/\s+/).filter(Boolean);
+    const own = (e: Exercise) => Number(e.source !== "pack" || usedIds.has(e.id));
+    return exercises
+      .map((e) => ({ e, s: exerciseScore(e, toks) }))
+      .filter(({ e, s }) => s > 0 && (muscle === "all" || e.muscle === muscle) && (equip === "all" || (e.equipment ?? "other") === equip))
+      // best search match first; without a query, your own and already-used exercises first, then the catalog alphabetically
+      .sort((a, b) => (toks.length ? b.s - a.s : 0) || own(b.e) - own(a.e) || a.e.name.localeCompare(b.e.name))
+      .map(({ e }) => e);
+  }, [exercises, q, muscle, equip, usedIds]);
+  const visible = showAll || q.trim() ? list : list.slice(0, 120);
 
   return (
     <Page>
@@ -34,19 +49,26 @@ export default function LibraryTab() {
         <Chip active={muscle === "all"} onClick={() => setMuscle("all")}>All</Chip>
         {MUSCLE_GROUPS.map((m) => <Chip key={m} active={muscle === m} onClick={() => setMuscle(m)} className="capitalize">{m}</Chip>)}
       </div>
+      <div className="scroll-x -mx-4 flex gap-2 px-4 md:mx-0 md:px-0">
+        <Chip active={equip === "all"} onClick={() => setEquip("all")}>Any equipment</Chip>
+        {EQUIPMENT_GROUPS.map((m) => <Chip key={m} active={equip === m} onClick={() => setEquip(m)} className="capitalize">{m}</Chip>)}
+      </div>
+      <div className="text-[12px] text-ink-3">{list.length.toLocaleString()} exercise{list.length === 1 ? "" : "s"}{exercises.length > 100 ? ` · ${exercises.length.toLocaleString()} in your library` : ""}</div>
       <div className="card divide-y divide-line px-4">
-        {list.map((e) => {
+        {visible.map((e) => {
           const pr = bestPR(exerciseHistory(workouts, e.id));
           return (
             <button key={e.id} onClick={() => setEdit(e)} className="flex w-full items-center gap-3 py-3 text-left active:bg-raised">
               <div className="min-w-0 flex-1">
                 <div className="text-[15px]">{e.name}</div>
-                <div className="text-[12px] text-ink-3"><span className="capitalize">{e.muscle}</span> · {e.scheme.sets} × {e.scheme.repsMin}–{e.scheme.repsMax} · {e.scheme.type} · +{e.increment} {profile.units.weight}{e.notes ? ` · ${e.notes}` : ""}</div>
+                <div className="text-[12px] text-ink-3"><span className="capitalize">{(e.primary?.[0] ?? e.muscle).replace(/s$/, (m) => m)}</span>{e.equipment ? ` · ${e.equipment}` : ""} · {e.scheme.sets} × {e.scheme.repsMin}–{e.scheme.repsMax} · {e.scheme.type} · +{e.increment} {profile.units.weight}{e.notes && !e.source ? ` · ${e.notes}` : ""}</div>
               </div>
               {pr && <div className="tnum text-right text-[12px] text-ink-2">PR<br /><span className="font-semibold text-ink">{pr.weight}×{pr.reps}</span></div>}
             </button>
           );
         })}
+        {!showAll && !q.trim() && list.length > visible.length && <button onClick={() => setShowAll(true)} className="w-full py-3 text-center text-[14px] font-medium text-accent">Show all {list.length.toLocaleString()}</button>}
+        {list.length === 0 && <div className="py-6 text-center text-[13px] text-ink-3">Nothing matches. Tap New to add it.</div>}
       </div>
 
       <ExerciseEditor ex={edit} onClose={() => setEdit(null)} unit={profile.units.weight} onSave={async (e) => { await saveExercise(e); setEdit(null); toast("Saved"); }} onDelete={(e) => { setEdit(null); setDel(e); }} />
@@ -65,7 +87,20 @@ export function ExerciseEditor({ ex, onClose, onSave, onDelete, unit }: { ex: Ex
       <div className="flex gap-2">{onDelete && ex?.updatedAt ? <Button variant="danger" onClick={() => onDelete(d)}>Delete</Button> : null}<Button full variant="primary" disabled={!d.name.trim()} onClick={() => onSave({ ...d, name: d.name.trim() })}>Save</Button></div>
     }>
       <div className="flex flex-col gap-3">
-        <Field label="Name"><Input autoFocus value={d.name} onChange={(e) => set({ name: e.target.value })} /></Field>
+        {d.instructions?.length ? (
+          <div className="rounded-xl bg-raised p-3 text-[13px]">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-ink-3">
+              {d.equipment && <span className="capitalize">{d.equipment}</span>}
+              {d.mechanic && <span className="capitalize">{d.mechanic}</span>}
+              {d.level && <span className="capitalize">{d.level}</span>}
+              {d.category && d.category !== "strength" && <span className="capitalize">{d.category}</span>}
+            </div>
+            {d.aliases?.length ? <div className="mt-1 text-ink-3">Also called {d.aliases.join(", ")}</div> : null}
+            {d.primary?.length ? <div className="mt-1"><span className="text-ink-3">Works </span><span className="capitalize">{d.primary.join(", ")}</span>{d.secondary?.length ? <span className="text-ink-3"> · also {d.secondary.join(", ")}</span> : null}</div> : null}
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-ink-2">{d.instructions.map((t, i) => <li key={i}>{t}</li>)}</ol>
+          </div>
+        ) : null}
+        <Field label="Name"><Input autoFocus={!d.instructions?.length} value={d.name} onChange={(e) => set({ name: e.target.value })} /></Field>
         <Field label="Muscle group"><select value={d.muscle} onChange={(e) => set({ muscle: e.target.value as Exercise["muscle"] })} className="field capitalize">{MUSCLE_GROUPS.map((m) => <option key={m} value={m}>{m}</option>)}</select></Field>
         <Field label="Progression style" hint="Heavy: add weight once you hit the top of the range. Failure: +1 rep until the top, then add weight. Feel: no targets.">
           <Segmented value={d.scheme.type} onChange={(v) => set({ scheme: { ...d.scheme, type: v } })} options={[{ value: "heavy", label: "Heavy" }, { value: "failure", label: "To failure" }, { value: "feel", label: "By feel" }]} className="w-full" />

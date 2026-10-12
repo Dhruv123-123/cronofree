@@ -18,7 +18,8 @@
     "cap:sync": "npm run build && cap sync",
     "android": "npm run cap:sync && cap open android",
     "android:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug && echo APK: android/app/build/outputs/apk/debug/app-debug.apk",
-    "ios": "npm run cap:sync && cap open ios"
+    "ios": "npm run cap:sync && cap open ios",
+    "exercises": "node --experimental-strip-types --no-warnings scripts/build-exercise-pack.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.2",

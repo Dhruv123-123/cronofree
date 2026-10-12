@@ -15,6 +15,7 @@ import { loadDraft, saveDraft } from "./draft";
 import { saveWorkout, getTrainPrefs, saveExercise, newExercise, type TrainPrefs, DEFAULT_TRAIN_PREFS } from "./trainRepo";
 import type { RestTimer } from "./useRestTimer";
 import { MUSCLE_GROUPS } from "@/lib/liftingDefaults";
+import { EQUIPMENT_GROUPS, exerciseScore } from "@/lib/exerciseTransform";
 
 const blankSet = (): DraftSet => ({ weight: "", reps: "", rpe: "", completed: false });
 
@@ -318,7 +319,14 @@ function FinishSheet({ open, onClose, draft, setDraft, unit, onConfirm, exById }
 export function AddExerciseSheet({ open, onClose, exercises, onPick, onCustom, exclude = [] }: { open: boolean; onClose: () => void; exercises: Exercise[]; onPick: (e: Exercise) => void; onCustom?: (name: string) => void; exclude?: string[] }) {
   const [q, setQ] = useState("");
   const [muscle, setMuscle] = useState<string>("all");
-  const list = exercises.filter((e) => !exclude.includes(e.id) && (muscle === "all" || e.muscle === muscle) && (!q || e.name.toLowerCase().includes(q.toLowerCase()))).sort((a, b) => a.name.localeCompare(b.name));
+  const [equip, setEquip] = useState<string>("all");
+  const toks = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const all = exercises
+    .map((e) => ({ e, s: exerciseScore(e, toks) }))
+    .filter(({ e, s }) => s > 0 && !exclude.includes(e.id) && (muscle === "all" || e.muscle === muscle) && (equip === "all" || (e.equipment ?? "other") === equip))
+    .sort((a, b) => (toks.length ? b.s - a.s : 0) || Number(b.e.source !== "pack") - Number(a.e.source !== "pack") || a.e.name.localeCompare(b.e.name))
+    .map(({ e }) => e);
+  const list = toks.length ? all.slice(0, 150) : all.slice(0, 80);
   return (
     <Sheet open={open} onClose={onClose} title="Add exercise" noPad>
       <div className="px-5">
@@ -327,13 +335,18 @@ export function AddExerciseSheet({ open, onClose, exercises, onPick, onCustom, e
           <Chip active={muscle === "all"} onClick={() => setMuscle("all")}>All</Chip>
           {MUSCLE_GROUPS.map((m) => <Chip key={m} active={muscle === m} onClick={() => setMuscle(m)} className="capitalize">{m}</Chip>)}
         </div>
+        <div className="scroll-x -mx-5 mt-2 flex gap-2 px-5">
+          <Chip active={equip === "all"} onClick={() => setEquip("all")}>Any equipment</Chip>
+          {EQUIPMENT_GROUPS.map((m) => <Chip key={m} active={equip === m} onClick={() => setEquip(m)} className="capitalize">{m}</Chip>)}
+        </div>
         <div className="mt-2 divide-y divide-line">
           {list.map((e) => (
-            <button key={e.id} onClick={() => onPick(e)} className="flex w-full items-center justify-between py-3 text-left active:bg-raised">
-              <span>{e.name}<span className="ml-2 text-[12px] capitalize text-ink-3">{e.muscle}</span></span>
+            <button key={e.id} onClick={() => onPick(e)} className="flex w-full items-center justify-between gap-2 py-3 text-left active:bg-raised">
+              <span className="min-w-0"><span className="block truncate">{e.name}</span><span className="block text-[12px] capitalize text-ink-3">{e.primary?.[0] ?? e.muscle}{e.equipment ? ` · ${e.equipment}` : ""}</span></span>
               <span className="text-[12px] text-ink-3">{e.scheme.sets} × {e.scheme.repsMin}–{e.scheme.repsMax}</span>
             </button>
           ))}
+          {all.length > list.length && <div className="py-2 text-center text-[12px] text-ink-3">{all.length - list.length} more · keep typing to narrow</div>}
           {q.trim() && onCustom && <button onClick={() => { onCustom(q.trim()); setQ(""); }} className="flex w-full items-center gap-2 py-3 text-left font-medium text-accent"><Plus size={16} /> Create “{q.trim()}”</button>}
         </div>
       </div>
