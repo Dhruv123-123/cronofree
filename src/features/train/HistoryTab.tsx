@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Search, Trash2, Trophy } from "lucide-react";
+import { Search, Trash2, Trophy, Pencil } from "lucide-react";
 import { db } from "@/db";
 import type { Workout } from "@/db/types";
 import { useProfile } from "@/hooks";
@@ -9,6 +9,7 @@ import { workoutVolume, workoutSetCount, exerciseHistory, isNewPR } from "@/lib/
 import { Page } from "@/components/Shell";
 import { Sheet, Confirm, EmptyState, Button, useToast } from "@/components/ui";
 import { deleteWorkout } from "./trainRepo";
+import { WorkoutEditor } from "./WorkoutEditor";
 
 export default function HistoryTab() {
   const profile = useProfile();
@@ -19,6 +20,7 @@ export default function HistoryTab() {
   const exName = useMemo(() => new Map(exercises.map((e) => [e.id, e.name])), [exercises]);
   const [q, setQ] = useState("");
   const [view, setView] = useState<Workout | null>(null);
+  const [edit, setEdit] = useState<Workout | null>(null);
   const [del, setDel] = useState<Workout | null>(null);
   const unit = profile.units.weight;
 
@@ -90,10 +92,14 @@ export default function HistoryTab() {
             {photos.filter((p) => p.workoutId === view.id).length > 0 && (
               <div className="mt-3 flex gap-2 overflow-x-auto">{photos.filter((p) => p.workoutId === view.id).map((p) => <img key={p.id} src={p.dataUrl} alt="" className="h-28 w-28 shrink-0 rounded-xl object-cover" />)}</div>
             )}
-            <Button variant="danger" className="mt-4" onClick={() => { setDel(view); setView(null); }}><Trash2 size={16} /> Delete workout</Button>
+            <div className="mt-4 flex gap-2">
+              <Button full variant="primary" onClick={() => { setEdit(view); setView(null); }}><Pencil size={16} /> Edit workout</Button>
+              <Button variant="danger" onClick={() => { setDel(view); setView(null); }}><Trash2 size={16} /> Delete</Button>
+            </div>
           </>
         )}
       </Sheet>
+      <WorkoutEditor workout={edit} exercises={exercises} unit={unit} onClose={() => setEdit(null)} />
       <Confirm open={!!del} title="Delete this workout?" body="It will be removed from history, stats and PRs." onCancel={() => setDel(null)} onConfirm={async () => { if (del) await deleteWorkout(del.id); setDel(null); toast("Workout deleted"); }} />
     </Page>
   );

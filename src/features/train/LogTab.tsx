@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Check, ChevronRight, Copy, Plus, Trash2, Trophy, TrendingDown, Camera, Image as ImageIcon, X, Timer } from "lucide-react";
 import { db } from "@/db";
-import type { Exercise, Program, Workout, WorkoutDraft, DraftExercise, DraftSet, WorkoutSet } from "@/db/types";
+import type { Exercise, Program, Workout, WorkoutDraft, DraftExercise, DraftSet } from "@/db/types";
 import { useProfile } from "@/hooks";
 import { useNow } from "@/hooks";
 import { today, formatShort, formatDuration } from "@/lib/dates";
@@ -12,6 +12,7 @@ import { compressImage, addPhoto } from "@/lib/photos";
 import { Page } from "@/components/Shell";
 import { Button, Sheet, Confirm, Input, Chip, useToast, EmptyState, Field } from "@/components/ui";
 import { loadDraft, saveDraft } from "./draft";
+import { finalizeDraft } from "@/lib/finalizeWorkout";
 import { saveWorkout, getTrainPrefs, saveExercise, newExercise, type TrainPrefs, DEFAULT_TRAIN_PREFS } from "./trainRepo";
 import type { RestTimer } from "./useRestTimer";
 import { MUSCLE_GROUPS } from "@/lib/liftingDefaults";
@@ -84,7 +85,7 @@ export default function LogTab({ timer }: { timer: RestTimer }) {
   const idx = Math.max(0, Math.min(dr.currentExerciseIdx, dr.exercises.length - 1));
   const cur = draft.exercises[idx];
   const curDef = cur ? exById.get(cur.exerciseId) : undefined;
-  const completedSets = draft.exercises.reduce((n, ex) => n + ex.sets.filter((s) => s.completed).length, 0);
+  const completedSets = draft.exercises.reduce((n, ex) => n + ex.sets.filter((s) => s.completed || (s.reps !== "" && parseFloat(s.reps) > 0)).length, 0);
   const totalSets = draft.exercises.reduce((n, ex) => n + ex.sets.length, 0);
 
   const setIdx = (i: number) => { setDraft((d) => d && { ...d, currentExerciseIdx: i }); window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -95,7 +96,7 @@ export default function LogTab({ timer }: { timer: RestTimer }) {
   function completeSet(exI: number, setI: number) {
     const s = dr.exercises[exI].sets[setI];
     const completing = !s.completed;
-    if (completing && (!s.weight || !s.reps)) { toast("Enter weight and reps first", "warn"); return; }
+    if (completing && !s.reps) { toast("Enter reps first (blank weight = bodyweight)", "warn"); return; }
     patchSet(exI, setI, { completed: completing });
     if (completing && prefs.autoStartTimer) {
       const def = exById.get(dr.exercises[exI].exerciseId);
@@ -109,11 +110,9 @@ export default function LogTab({ timer }: { timer: RestTimer }) {
   }
 
   async function finishWorkout() {
-    const final = dr.exercises.map((ex) => ({
-      exerciseId: ex.exerciseId, customName: ex.customName,
-      sets: ex.sets.filter((s) => s.completed && s.weight !== "" && s.reps !== "").map<WorkoutSet>((s) => ({ weight: parseFloat(s.weight), reps: parseInt(s.reps), rpe: s.rpe ? parseFloat(s.rpe) : null, completed: true })),
-    })).filter((ex) => ex.sets.length > 0);
-    if (!final.length) { toast("No completed sets to save", "warn"); return; }
+    // every set with reps is saved, ticked or not; blank weight = bodyweight
+    const { exercises: final } = finalizeDraft(dr.exercises);
+    if (!final.length) { toast("No sets with reps to save", "warn"); return; }
     const id = uid("wo");
     const w: Workout = { id, date: dr.date, startedAt: dr.startedAt, finishedAt: Date.now(), programId: dr.programId, programDayId: dr.programDayId, programDayName: dr.programDayName, exercises: final, sessionNotes: dr.sessionNotes.trim() || undefined, updatedAt: 0 };
     // PR count for the toast
@@ -259,7 +258,7 @@ function SetRow({ i, s, unit, onPatch, onComplete, onCopy, onRemove, isPR }: { i
   function onRepsBlur(e: React.FocusEvent<HTMLInputElement>) {
     // auto-complete when both filled and focus leaves this row (LiftLog behaviour)
     const next = e.relatedTarget as HTMLElement | null;
-    if (!s.completed && s.weight && s.reps && !(next && rowRef.current?.contains(next))) onComplete();
+    if (!s.completed && s.reps && !(next && rowRef.current?.contains(next))) onComplete();
   }
   return (
     <div ref={rowRef} className="grid grid-cols-[28px_1fr_1fr_64px_44px_28px] items-center gap-2">
@@ -279,8 +278,9 @@ function SetRow({ i, s, unit, onPatch, onComplete, onCopy, onRemove, isPR }: { i
 function FinishSheet({ open, onClose, draft, setDraft, unit, onConfirm, exById }: { open: boolean; onClose: () => void; draft: WorkoutDraft; setDraft: (d: WorkoutDraft) => void; unit: string; onConfirm: () => void; exById: Map<string, Exercise> }) {
   const camRef = useRef<HTMLInputElement>(null);
   const libRef = useRef<HTMLInputElement>(null);
-  const done = draft.exercises.flatMap((ex) => ex.sets.filter((s) => s.completed && s.weight && s.reps).map((s) => ({ ...s, ex })));
-  const volume = done.reduce((a, s) => a + parseFloat(s.weight) * parseInt(s.reps), 0);
+  const fin = finalizeDraft(draft.exercises);
+  const done = fin.exercises.flatMap((ex) => ex.sets.map((s) => ({ ...s, ex })));
+  const volume = done.reduce((a, s) => a + s.weight * s.reps, 0);
   async function pick(files: FileList | null) {
     if (!files) return;
     const added: { id: string; dataUrl: string }[] = [];
@@ -295,9 +295,16 @@ function FinishSheet({ open, onClose, draft, setDraft, unit, onConfirm, exById }
         <div className="rounded-xl bg-raised p-3 text-center"><div className="tnum display text-[22px] font-semibold"><Elapsed since={draft.startedAt} /></div><div className="text-[11px] text-ink-3">duration</div></div>
       </div>
       <div className="mt-3 divide-y divide-line text-[13px]">
-        {draft.exercises.filter((ex) => ex.sets.some((s) => s.completed)).map((ex, i) => (
-          <div key={i} className="flex justify-between py-1.5"><span>{exById.get(ex.exerciseId)?.name ?? ex.customName}</span><span className="tnum text-ink-2">{ex.sets.filter((s) => s.completed).map((s) => `${s.weight}×${s.reps}`).join("  ")}</span></div>
+        {fin.exercises.map((ex, i) => (
+          <div key={i} className="flex justify-between py-1.5"><span>{exById.get(ex.exerciseId)?.name ?? ex.customName}</span><span className="tnum text-ink-2">{ex.sets.map((s) => `${s.weight}×${s.reps}`).join("  ")}</span></div>
         ))}
+        {fin.untickedSaved > 0 && <div className="mt-2 text-[12px] text-ink-3">{fin.untickedSaved} set{fin.untickedSaved > 1 ? "s" : ""} you typed but didn't tick will be saved too.</div>}
+        {(fin.skipped.length > 0 || fin.droppedExercises.length > 0) && (
+          <div className="mt-2 rounded-xl bg-warn-soft p-3 text-[13px] text-warn">
+            {fin.skipped.length > 0 && <div>{fin.skipped.length} set{fin.skipped.length > 1 ? "s" : ""} without reps will be skipped.</div>}
+            {fin.droppedExercises.length > 0 && <div>Not saved (no sets with reps): {fin.droppedExercises.map((i) => exById.get(draft.exercises[i].exerciseId)?.name ?? draft.exercises[i].customName ?? "exercise").join(", ")}. Go back and enter reps to keep them.</div>}
+          </div>
+        )}
       </div>
       <Field label="Session notes" className="mt-4"><textarea rows={3} value={draft.sessionNotes} onChange={(e) => setDraft({ ...draft, sessionNotes: e.target.value })} className="field" placeholder="How did it go? Sleep, energy, form cues…" /></Field>
       <div className="mt-4">
