@@ -169,7 +169,7 @@ The server is plain HTTP, which is fine on your LAN. To use it from anywhere, pu
 ### Train (LiftLog, rebuilt)
 Everything the original does, redesigned:
 - **Programs** with days, templates (the original Chest/Back · Legs · Shoulders/Arms split, Beginner full-body, Upper/Lower, PPL), active program, drag-free reorder, rename, delete.
-- **Exercise library** (33 built in) with muscle group, progression scheme (heavy / to failure / by feel), rep range, default sets, weight increment, notes; create your own.
+- **Exercise library** (916 movements built in, from the public-domain free-exercise-db plus curated extras, each with target muscles, equipment, step-by-step instructions and gym-name aliases) with muscle group, progression scheme (heavy / to failure / by feel), rep range, default sets, weight increment, notes; create your own.
 - **Workout flow**: pick today's day, one exercise at a time with a stepper, sets with weight/reps/RPE, tap-to-fill **smart target** (LiftLog's rules: +1 rep until the top of the range, then add the increment), last session, PR badge, **plateau warning** (flat e1RM across 3 sessions over ≥14 days), copy previous set, add/remove sets, add exercises mid-workout, auto-complete on blur, **rest timer** with chime + vibration (longer rest for heavy lifts), elapsed time, session notes, photos, and an auto-saved draft that survives closing the app.
 - **History** with search, per-exercise PR highlighting, delete.
 - **Stats**: e1RM (Epley) / top weight / volume per exercise, weekly volume over 12 weeks, sets per muscle group this week, week streak.
